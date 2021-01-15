@@ -1,3 +1,4 @@
+#include "Application.h"
 #include <iostream>
 
 // Quick desc:
@@ -5,8 +6,9 @@
 // Supports diff checking, manual backup, and automatic backups. Ideally should work on linux too, and use CMake and TDD.
 
 int main(int argc, char** argv) {
-    std::cout << "Test.\n";
-    std::cin.get();
+    Application app;
+    bool result = app.checkFileEquivalence("sandbox/tmp.txt", "sandbox/a.txt");
+    std::cout << "app.checkFileEquivalence = " << result << "\n";
     
     return 0;
 }
