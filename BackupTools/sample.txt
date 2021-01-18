@@ -1,0 +1,15 @@
+root x dest
+
+in "x/" add "source/a.txt"
+in x/thing add source/*
+
+ignore *.exe
+
+# comment
+
+in x/ 
+    add source/*    
+
+ include *.exe
+
+    # commands: root, in, add, ignore, include
