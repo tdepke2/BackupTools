@@ -1,7 +1,7 @@
 root x dest
 
 in "x/" add "source/a.txt"
-in x/thing add source/*
+in x/ add source/*
 
 ignore *.exe
 

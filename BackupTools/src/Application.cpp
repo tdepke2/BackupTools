@@ -47,105 +47,22 @@ void Application::loadFile(const fs::path& filename) {
     if (!configFile_.is_open()) {
         throw std::runtime_error("Unable to open file.");
     }
+    
+    lineNumber_ = 0;
+    rootPaths_.clear();
+    ignorePaths_.clear();
+    previousReadPaths_.clear();
+    writePath_.clear();
+    readPath_.clear();
+    writePathSet_ = false;
+    readPathSet_ = false;
 }
 
 void Application::printPaths() {
-    /*while (hasNextPath()) {
-        std::pair<fs::path, fs::path> nextPath = getNextPath();
-        cout << "[" << nextPath.first << "] <- [" << nextPath.second << "]\n";
-    }*/
-    
-    std::string line;
-    unsigned int lineNumber = 0;
-    fs::path writePath;
-    bool writePathSet = false;
-    while (getline(configFile_, line)) {
-        ++lineNumber;
-        /*std::string::size_type lastNonSpace = line.find_last_not_of(' ');    // Trim whitespace.
-        if (lastNonSpace != std::string::npos && lastNonSpace != line.length() - 1) {
-            line.erase(lastNonSpace + 1);
-        }
-        std::string::size_type firstNonSpace = line.find_first_not_of(' ');
-        if (firstNonSpace != std::string::npos && firstNonSpace != 0) {
-            line.erase(0, firstNonSpace);
-        }*/
-        std::string::size_type index = 0;
-        skipWhitespace(index, line);
-        std::cout << "Line " << lineNumber << ": [" << line << "]\n";
-        if (index >= line.length() || line[index] == '#') {
-            continue;
-        }
+    for (std::pair<fs::path, fs::path> nextPath = getNextWriteReadPath(); !nextPath.first.empty() || !nextPath.second.empty(); nextPath = getNextWriteReadPath()) {
         
-        std::string command = parseNextCommand(index, line);
-        if (command == "root") {    // Syntax: root <identifier> <replacement path>
-            skipWhitespace(index, line);
-            if (index >= line.length()) {
-                std::cout << "Error: Missing first path.\n";
-            }
-            fs::path keyPath = parseNextPath(index, line);
-            skipWhitespace(index, line);
-            fs::path valuePath = parseNextPath(index, line);
-            std::cout << "    Root: [" << keyPath << "] [" << valuePath << "]\n";
-            
-            rootPaths_.insert({keyPath, valuePath});
-        } else if (command == "in") {    // Syntax: in <write path> [add <read path>]
-            skipWhitespace(index, line);
-            if (index >= line.length()) {
-                std::cout << "Error: Missing first path.\n";
-            }
-            writePath = substituteRootPath(parseNextPath(index, line));
-            writePathSet = true;
-            skipWhitespace(index, line);
-            if (index < line.length()) {
-                command = parseNextCommand(index, line);
-                if (command != "add") {
-                    std::cout << "Error: Unexpected data.\n";
-                }
-                skipWhitespace(index, line);
-                if (index >= line.length()) {
-                    std::cout << "Error: Missing path.\n";
-                }
-                fs::path readPath = substituteRootPath(parseNextPath(index, line));
-                
-                std::cout << "    In: [" << writePath << "] [" << readPath << "]\n";
-            }
-        } else if (command == "add") {    // Syntax (write path must have previously been set): add <read path>
-            skipWhitespace(index, line);
-            if (!writePathSet) {
-                std::cout << "Error: Missing write path.\n";
-            }
-            if (index >= line.length()) {
-                std::cout << "Error: Missing path.\n";
-            }
-            fs::path readPath = substituteRootPath(parseNextPath(index, line));
-            
-            std::cout << "    Add: [" << writePath << "] [" << readPath << "]\n";
-        } else if (command == "ignore") {    // Syntax: ignore <path>
-            skipWhitespace(index, line);
-            if (index >= line.length()) {
-                std::cout << "Error: Missing path.\n";
-            }
-            fs::path ignorePath = substituteRootPath(parseNextPath(index, line));
-            
-            std::cout << "    Ignore: [" << ignorePath << "]\n";
-        } else if (command == "include") {    // Syntax (path must match previously ignored path): include <path>
-            skipWhitespace(index, line);
-            if (index >= line.length()) {
-                std::cout << "Error: Missing path.\n";
-            }
-            fs::path includePath = substituteRootPath(parseNextPath(index, line));
-            
-            std::cout << "    Include: [" << includePath << "]\n";
-        } else {
-            std::cout << "Error: Unknown command [" << command << "]\n";
-        }
-        skipWhitespace(index, line);
-        if (index < line.length()) {
-            std::cout << "Error: Unexpected data.\n";
-        }
+        std::cout << "        printPaths() [" << nextPath.first << "] <- [" << nextPath.second << "]\n";
     }
-    
-    configFile_.close();
 }
 
 void Application::skipWhitespace(std::string::size_type& index, const std::string& str) {
@@ -198,10 +115,120 @@ fs::path Application::substituteRootPath(const fs::path& path) {
     return path;
 }
 
-bool Application::hasNextPath() const {
-    return false;
+void Application::parseNextLineInFile() {
+    std::string line;
+    if (!getline(configFile_, line)) {
+        configFile_.close();
+        return;
+    }
+    
+    ++lineNumber_;
+    /*std::string::size_type lastNonSpace = line.find_last_not_of(' ');    // Trim whitespace.
+    if (lastNonSpace != std::string::npos && lastNonSpace != line.length() - 1) {
+        line.erase(lastNonSpace + 1);
+    }
+    std::string::size_type firstNonSpace = line.find_first_not_of(' ');
+    if (firstNonSpace != std::string::npos && firstNonSpace != 0) {
+        line.erase(0, firstNonSpace);
+    }*/
+    std::string::size_type index = 0;
+    skipWhitespace(index, line);
+    std::cout << "Line " << lineNumber_ << ": [" << line << "]\n";
+    if (index >= line.length() || line[index] == '#') {
+        return;
+    }
+    
+    std::string command = parseNextCommand(index, line);
+    if (command == "root") {    // Syntax: root <identifier> <replacement path>
+        skipWhitespace(index, line);
+        if (index >= line.length()) {
+            std::cout << "Error: Missing first path.\n";
+        }
+        fs::path keyPath = parseNextPath(index, line);
+        skipWhitespace(index, line);
+        fs::path valuePath = parseNextPath(index, line);
+        std::cout << "    Root: [" << keyPath << "] [" << valuePath << "]\n";
+        
+        rootPaths_.insert({keyPath, valuePath});
+    } else if (command == "in") {    // Syntax: in <write path> [add <read path>]
+        skipWhitespace(index, line);
+        if (index >= line.length()) {
+            std::cout << "Error: Missing first path.\n";
+        }
+        writePath_ = substituteRootPath(parseNextPath(index, line));
+        writePathSet_ = true;
+        skipWhitespace(index, line);
+        if (index < line.length()) {
+            command = parseNextCommand(index, line);
+            if (command != "add") {
+                std::cout << "Error: Unexpected data.\n";
+            }
+            skipWhitespace(index, line);
+            if (index >= line.length()) {
+                std::cout << "Error: Missing path.\n";
+            }
+            readPath_ = substituteRootPath(parseNextPath(index, line));
+            readPathSet_ = true;
+            
+            std::cout << "    In: [" << writePath_ << "] [" << readPath_ << "]\n";
+        }
+    } else if (command == "add") {    // Syntax (write path must have previously been set): add <read path>
+        skipWhitespace(index, line);
+        if (!writePathSet_) {
+            std::cout << "Error: Missing write path.\n";
+        }
+        if (index >= line.length()) {
+            std::cout << "Error: Missing path.\n";
+        }
+        readPath_ = substituteRootPath(parseNextPath(index, line));
+        readPathSet_ = true;
+        
+        std::cout << "    Add: [" << writePath_ << "] [" << readPath_ << "]\n";
+    } else if (command == "ignore") {    // Syntax: ignore <path>
+        skipWhitespace(index, line);
+        if (index >= line.length()) {
+            std::cout << "Error: Missing path.\n";
+        }
+        fs::path ignorePath = substituteRootPath(parseNextPath(index, line));
+        
+        std::cout << "    Ignore: [" << ignorePath << "]\n";
+        
+        ignorePaths_.insert(ignorePath);
+    } else if (command == "include") {    // Syntax: include <path>
+        skipWhitespace(index, line);
+        if (index >= line.length()) {
+            std::cout << "Error: Missing path.\n";
+        }
+        fs::path includePath = substituteRootPath(parseNextPath(index, line));
+        
+        std::cout << "    Include: [" << includePath << "]\n";
+        
+        auto findResult = ignorePaths_.find(includePath);
+        if (findResult != ignorePaths_.end()) {
+            ignorePaths_.erase(findResult);
+        }
+    } else {
+        std::cout << "Error: Unknown command [" << command << "]\n";
+    }
+    skipWhitespace(index, line);
+    if (index < line.length()) {
+        std::cout << "Error: Unexpected data.\n";
+    }
 }
 
-std::pair<fs::path, fs::path> Application::getNextPath() {
-    return std::make_pair<fs::path, fs::path>({}, {});
+std::pair<fs::path, fs::path> Application::getNextWriteReadPath() {
+    while (!readPathSet_) {
+        if (!configFile_.is_open()) {
+            return {fs::path(), fs::path()};
+        }
+        parseNextLineInFile();
+    }
+    
+    //for () {
+        
+    //}
+    
+    readPathSet_ = false;
+    
+    return {writePath_, readPath_};
 }
