@@ -1,7 +1,94 @@
 #include "Application.h"
 #include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <stdexcept>
+
+char Application::pathSeparator = std::filesystem::path::preferred_separator;
+
+bool Application::fnmatchPortable(char const* pattern, char const* str) {
+    if (*pattern == '*' && *str == '.') {    // Exception when trying to match .file with star. Skip leading stars.
+        do {
+            ++pattern;
+        } while (*pattern == '*');
+    }
+    
+    return fnmatchPortable_(pattern, str);
+}
+
+bool Application::fnmatchPortable_(char const* pattern, char const* str) {
+    while (*str != '\0') {
+        if (*pattern == '*') {    // Star matches zero to n characters. Does not match separator and does not match a leading dot in a name.
+            do {    // Skip consecutive stars (globstar not supported).
+                ++pattern;
+            } while (*pattern == '*');
+            
+            if (fnmatchPortable_(pattern, str)) {    // Attempt to match zero characters.
+                return true;
+            }
+            if (*str == '.' && *(str - 1) == pathSeparator) {    // If sub-match failed and leading dot, match failed.
+                return false;
+            }
+            do {
+                if (*str == pathSeparator) {    // If sub-match failed with path separator, match failed.
+                    return false;
+                }
+                ++str;
+                if (fnmatchPortable_(pattern, str)) {    // Skip character and attempt sub-match again (includes matching against null character).
+                    return true;
+                }
+            } while (*str != '\0');
+            
+            return false;
+        } else if (*pattern == '?') {    // Question mark matches any one character. Does not match separator.
+            if (*str == pathSeparator) {
+                return false;
+            }
+            ++pattern;
+            ++str;
+        } else if (*pattern == '[') {    // Brackets match any characters contained within (including other brackets, a ] must come first) except when brackets are empty. Does not match separator.
+            char const* patternHead = pattern;
+            ++pattern;
+            if (*pattern == '\0') {
+                return *str == '[';
+            }
+            bool matchedChar = false;
+            do {
+                if (*pattern == *str) {
+                    matchedChar = true;
+                }
+                ++pattern;
+            } while (*pattern != ']' && *pattern != '\0');    // need to double check all of this ######################################################
+            
+            if (*pattern == ']') {
+                if (matchedChar) {
+                    ++pattern;
+                } else {
+                    return false;
+                }
+            } else {
+                while (*patternHead != '\0') {
+                    if (*pattern != *str) {
+                        return false;
+                    }
+                    ++pattern;
+                    ++str;
+                }
+            }
+            
+        } else if (*pattern == *str) {    // Else, characters should match exactly.
+            ++pattern;
+            ++str;
+        } else {
+            return false;
+        }
+    }
+    
+    while (*pattern == '*') {    // Skip trailing stars.
+        ++pattern;
+    }
+    return *pattern == '\0';
+}
 
 bool Application::checkFileEquivalence(const fs::path& source, const fs::path& dest) const {
     /*std::uintmax_t sourceSize, destSize;

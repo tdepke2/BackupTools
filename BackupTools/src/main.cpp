@@ -11,7 +11,6 @@
 // Supports diff checking, manual backup, and automatic backups. Ideally should work on linux too, and use CMake and TDD.
 
 bool fnmatchPortable(const std::string& pattern, const std::string& str, std::string::size_type pIndex = 0, std::string::size_type sIndex = 0);
-bool fnmatchPortable2(char const* pattern, char const* str);
 
 int main(int argc, char** argv) {
     Application app;
@@ -25,7 +24,7 @@ int main(int argc, char** argv) {
     std::string strSpec;
     while (true) {
         getline(std::cin, strSpec);
-        std::cout << "Match with [" << strFile << "]: " << fnmatchPortable2(strSpec.c_str(), strFile.c_str()) << "\n";
+        std::cout << "Match with [" << strFile << "]: " << fnmatchPortable(strSpec, strFile) << "\n";
     }
     
     return 0;
@@ -72,53 +71,13 @@ bool fnmatchPortable(const std::string& pattern, const std::string& str, std::st
     return pIndex == pattern.length() && sIndex == str.length();
 }
 
-bool fnmatchPortable2(char const* pattern, char const* str) {
-    while (*str != '\0') {
-        if (*pattern == '*') {
-            do {
-                ++pattern;
-            } while (*pattern == '*');
-            if (*pattern == '\0') {    // Not gonna work, need to exclude path sep #######################
-                return true;
-            }
-            
-            while (*str != '\0') {
-                if (fnmatchPortable2(pattern, str)) {
-                    return true;
-                }
-                ++str;
-            }
-            
-            return false;
-        } else if (*pattern == '?') {
-            if (*str == '.' || *str == pathSeparator) {
-                return false;
-            }
-            ++pattern;
-            ++str;
-        } else if (*pattern == '[') {
-            
-        } else if (*pattern == *str) {
-            ++pattern;
-            ++str;
-        } else {
-            return false;
-        }
-    }
-    
-    while (*pattern == '*') {
-        ++pattern;
-    }
-    return *pattern == '\0';
-}
-
 /*
 Alternative just in case https://stackoverflow.com/questions/35877738/windows-fnmatch-substitute
 Similar impl https://stackoverflow.com/questions/3300419/file-name-matching-with-wildcard
 
 Glob mechanics: https://www.man7.org/linux/man-pages/man7/glob.7.html
 Wildcards: * ? [abc] [a-z] [!abc] [!a-z]
-? does not match .
+? matches any single char
 * matches all except for .files, but these can be matched with .*
 Path separator / or \ never matched
 
