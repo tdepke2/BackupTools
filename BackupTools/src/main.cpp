@@ -22,10 +22,10 @@ int main(int argc, char** argv) {
     
     std::string strFile = "Hello";
     std::string strSpec;
-    while (true) {
-        getline(std::cin, strSpec);
-        std::cout << "Match with [" << strFile << "]: " << fnmatchPortable(strSpec, strFile) << "\n";
-    }
+    //while (true) {
+        //getline(std::cin, strSpec);
+        //std::cout << "Match with [" << strFile << "]: " << fnmatchPortable(strSpec, strFile) << "\n";
+    //}
     
     return 0;
 }
@@ -70,22 +70,3 @@ bool fnmatchPortable(const std::string& pattern, const std::string& str, std::st
     
     return pIndex == pattern.length() && sIndex == str.length();
 }
-
-/*
-Alternative just in case https://stackoverflow.com/questions/35877738/windows-fnmatch-substitute
-Similar impl https://stackoverflow.com/questions/3300419/file-name-matching-with-wildcard
-
-Glob mechanics: https://www.man7.org/linux/man-pages/man7/glob.7.html
-Wildcards: * ? [abc] [a-z] [!abc] [!a-z]
-? matches any single char
-* matches all except for .files, but these can be matched with .*
-Path separator / or \ never matched
-
-*e*lo
-H*
-*
-??*?
-Hello
-
-
-*/

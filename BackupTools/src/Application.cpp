@@ -6,22 +6,29 @@
 
 char Application::pathSeparator = std::filesystem::path::preferred_separator;
 
-bool Application::fnmatchPortable(char const* pattern, char const* str) {
+// TODO: delete this when done with reference code.  ################################
+/*bool Application::fnmatchPortable(char const* pattern, char const* str) {
     if (*pattern == '*' && *str == '.') {    // Exception when trying to match .file with star. Skip leading stars.
         do {
             ++pattern;
         } while (*pattern == '*');
+    } else if (*pattern == '?' && *str == '.') {    // Exception when trying to match .file with question mark.
+        return false;
     }
     
     return fnmatchPortable_(pattern, str);
 }
 
 bool Application::fnmatchPortable_(char const* pattern, char const* str) {
-    while (*str != '\0') {
+    /*while (*str != '\0') {
         if (*pattern == '*') {    // Star matches zero to n characters. Does not match separator and does not match a leading dot in a name.
             do {    // Skip consecutive stars (globstar not supported).
                 ++pattern;
             } while (*pattern == '*');
+            
+            if (*str == '.' && *(str - 1) == pathSeparator) {
+                // ################################
+            }
             
             if (fnmatchPortable_(pattern, str)) {    // Attempt to match zero characters.
                 return true;
@@ -40,42 +47,45 @@ bool Application::fnmatchPortable_(char const* pattern, char const* str) {
             } while (*str != '\0');
             
             return false;
-        } else if (*pattern == '?') {    // Question mark matches any one character. Does not match separator.
-            if (*str == pathSeparator) {
+        } else if (*pattern == '?') {    // Question mark matches any one character. Does not match separator and does not match a leading dot in a name.
+            if (*str == pathSeparator || (*str == '.' && *(str - 1) == pathSeparator)) {
                 return false;
             }
             ++pattern;
             ++str;
-        } else if (*pattern == '[') {    // Brackets match any characters contained within (including other brackets, a ] must come first) except when brackets are empty. Does not match separator.
-            char const* patternHead = pattern;
+        } else if (*pattern == '[') {    // Brackets match any characters contained within (including other brackets, a ] must come first) except when brackets are empty. Does not match separator (but can match leading dot unlike on UNIX fnmatch).
             ++pattern;
+            char const* patternNext = pattern;
+            bool matchedChar = false, invertSearch = false, parseError = false;
             if (*pattern == '\0') {
                 return *str == '[';
+            } else if (*pattern == '!' || *pattern == '^') {    // Inverted search.
+                invertSearch = true;
             }
-            bool matchedChar = false;
             do {
-                if (*pattern == *str) {
+                if (*pattern == pathSeparator) {
+                    parseError = true;
+                    break;
+                } else if (*pattern == *str) {
                     matchedChar = true;
                 }
                 ++pattern;
-            } while (*pattern != ']' && *pattern != '\0');    // need to double check all of this ######################################################
+            } while (*pattern != ']' && *pattern != '\0');
             
-            if (*pattern == ']') {
-                if (matchedChar) {
+            if (*pattern == ']' && !parseError) {    // Ending bracket found, matchedChar determines result.
+                if (matchedChar != invertSearch) {
                     ++pattern;
+                    ++str;
                 } else {
                     return false;
                 }
-            } else {
-                while (*patternHead != '\0') {
-                    if (*pattern != *str) {
-                        return false;
-                    }
-                    ++pattern;
-                    ++str;
+            } else {    // Ending bracket not found, a [] was used without a ] later on, or invalid character inside []. Remaining string must lexically match.
+                if (*str != '[') {
+                    return false;
                 }
+                pattern = patternNext;
+                ++str;
             }
-            
         } else if (*pattern == *str) {    // Else, characters should match exactly.
             ++pattern;
             ++str;
@@ -88,6 +98,216 @@ bool Application::fnmatchPortable_(char const* pattern, char const* str) {
         ++pattern;
     }
     return *pattern == '\0';
+}*/
+
+// Helper function for fnmatchSimple().
+bool fnmatchSimple_(char const* pattern, char const* str) {
+    while (*str != '\0' && *str != Application::pathSeparator) {
+        if (*pattern == '*') {    // Star matches zero to n characters. Does not match a leading dot in a name.
+            do {    // Skip consecutive stars (globstar not supported).
+                ++pattern;
+            } while (*pattern == '*');
+            
+            if (fnmatchSimple_(pattern, str)) {    // Attempt to match zero characters.
+                return true;
+            }
+            do {
+                ++str;
+                if (fnmatchSimple_(pattern, str)) {    // Skip character and attempt sub-match again (includes matching against null character).
+                    return true;
+                }
+            } while (*str != '\0' && *str != Application::pathSeparator);
+            
+            return false;
+        } else if (*pattern == '?') {    // Question mark matches any one character. Does not match a leading dot in a name.
+            ++pattern;
+            ++str;
+        } else if (*pattern == '[') {    // Brackets match any characters contained within (including other brackets, a ] must come first) except when brackets are empty. Can match leading dot unlike on UNIX fnmatch.
+            /*++pattern;
+            char const* patternNext = pattern;
+            bool matchedChar = false, invertSearch = false;
+            if (*pattern == '\0' || *pattern == Application::pathSeparator) {
+                return *str == '[';
+            } else if (*pattern == '!' || *pattern == '^') {    // Inverted search.
+                invertSearch = true;
+                ++pattern;
+                if (*pattern == '\0' || *pattern == Application::pathSeparator) {
+                    return *str == '[' && *(str + 1) == *(pattern - 1);
+                }
+            }
+            while (true) {
+                if (*pattern == *str) {
+                    matchedChar = true;
+                }
+                ++pattern;
+                if (*pattern == ']') {    // Ending bracket found, matchedChar determines result.
+                    if (matchedChar != invertSearch) {
+                        ++pattern;
+                        ++str;
+                        break;
+                    } else {
+                        return false;
+                    }
+                } else if (*pattern == '\0' || *pattern == Application::pathSeparator) {    // Ending bracket not found, a [] was used without a ] later on. Remaining string must lexically match.
+                    if (*str != '[') {
+                        return false;
+                    }
+                    pattern = patternNext;
+                    ++str;
+                    break;
+                }
+            }*/
+            
+            ++pattern;
+            bool invertSearch = false;
+            if (*pattern == '\0' || *pattern == Application::pathSeparator) {    // Case where [ is remaining pattern.
+                return *str == '[';
+            } else if (*pattern == '!' || *pattern == '^') {    // Inverted search.
+                invertSearch = true;
+                ++pattern;
+                if (*pattern == '\0' || *pattern == Application::pathSeparator) {    // Case where [! or [^ is remaining pattern.
+                    return *str == '[' && *(str + 1) == *(pattern - 1);
+                }
+            }
+            char const* endingBracket = pattern;
+            while (true) {
+                ++endingBracket;
+                if (*endingBracket == '\0' || *endingBracket == Application::pathSeparator) {
+                    if (*pattern == ']') {
+                        if (invertSearch) {    // Case where [!]* or [^]* is remaining pattern (and no more ] left).
+                            if (*str != *(pattern - 1)) {
+                                return false;
+                            }
+                        } else {    // Case where []* is remaining pattern (and no more ] left).
+                            if (*str != '[' && *(str + 1) != ']') {
+                                return false;
+                            }
+                            ++str;
+                        }
+                        ++pattern;
+                    } else {    // Else, there is no end bracket.
+                        if (*str != '[') {
+                            return false;
+                        }
+                        pattern -= (invertSearch ? 1 : 0);
+                    }
+                    ++str;    // Remaining string must lexically match.
+                    break;
+                } else if (*endingBracket == ']') {
+                    bool matchedChar = false;
+                    while (pattern != endingBracket) {
+                        if (*pattern == *str) {
+                            matchedChar = true;
+                        }
+                        ++pattern;
+                    }
+                    if (matchedChar != invertSearch) {
+                        ++pattern;
+                        ++str;
+                    } else {
+                        return false;
+                    }
+                    break;
+                }
+            }
+        } else if (*pattern == *str) {    // Else, characters should match exactly.
+            ++pattern;
+            ++str;
+        } else {
+            return false;
+        }
+    }
+    
+    while (*pattern == '*') {    // Skip trailing stars.
+        ++pattern;
+    }
+    return *pattern == '\0' || *pattern == Application::pathSeparator;
+}
+
+// Alternative fnmatch version for cases with either no path separators, or path separators only at the end of pattern and str.
+bool fnmatchSimple(char const* pattern, char const* str) {
+    if (*pattern == '*' && *str == '.') {    // Star does not match a leading dot in a name (because it's not supposed to match hidden files or the . and .. directories).
+        return false;
+    } else if (*pattern == '?' && *str == '.') {    // Question mark does not match a leading dot in a name.
+        return false;
+    }
+    
+    return fnmatchSimple_(pattern, str);
+}
+
+/** Implementation of the unix fnmatch(3) function. Has a bit fewer options but still matches most patterns decently well.
+    Alternative for windows (not very good though): https://stackoverflow.com/questions/35877738/windows-fnmatch-substitute
+    Simpler but less powerful version: https://stackoverflow.com/questions/3300419/file-name-matching-with-wildcard
+    Glob mechanics: https://www.man7.org/linux/man-pages/man7/glob.7.html    https://www.gnu.org/software/bash/manual/html_node/Pattern-Matching.html
+    
+    Wildcards: ? * [abc] [a-z] [!abc] [!a-z]
+    ? matches any single character (except leading . in filename).
+    * matches any number of characters (except leading . in filename, which can be matched with .* pattern).
+    [] matches any single character in the brackets (to match a ] it must be first in the list, besides the optional ! or ^). An empty list is matched as it is (it matches to [] string).
+        Use a ! or ^ as first character to invert and only match if the character is not contained in the list.
+        Use a - to specify a range, the range only matches if left character is less than/equal to right. Range can include non-alphanumeric characters. Put - as first (with exception of ! or ^) or last character to match the - instead.
+    ** is not currently supported (globstar).
+*/
+bool Application::fnmatchPortable(char const* pattern, char const* str) {
+    while (true) {
+        if (!fnmatchSimple(pattern, str)) {
+            return false;
+        }
+        while (*pattern != pathSeparator && *pattern != '\0') {
+            ++pattern;
+        }
+        while (*str != pathSeparator && *str != '\0') {
+            ++str;
+        }
+        if (*pattern != *str) {
+            return false;
+        } else if (*pattern == '\0') {
+            return true;
+        }
+        ++pattern;
+        ++str;
+    }
+    return false;
+}
+
+std::vector<fs::path> Application::globPortable(const fs::path& pattern) {
+    //const fs::path current = fs::current_path();
+    
+    std::vector<fs::path> result;
+    
+    auto patternIter = pattern.begin();
+    //auto currentIter = current.begin();
+    if (pattern.root_directory().empty()) {    // Check if pattern is relative.
+        result.push_back("relative");
+    } else {    // Pattern is absolute.
+        
+        // Note: Since fs::directory_iterator passes over the . and .. hardlinks, may be necessary to only use absolute paths (with the make_absolute thingy) and normalize paths first?
+        // ######################################################################################################
+        
+        if (pattern.has_root_name()) {    // Skip root name.
+            ++patternIter;
+        }
+        ++patternIter;    // Skip root directory.
+        
+        
+        
+        fs::path patternTraversal = pattern.root_path();
+        while (patternIter != pattern.end()) {
+            for (const auto& entry : fs::directory_iterator(patternTraversal)) {
+                if (entry.path().filename() == *patternIter) {
+                    result.push_back(patternTraversal / *patternIter);
+                }
+                //result.push_back(entry.path().filename());
+            }
+            
+            patternTraversal /= *patternIter;
+            result.push_back("============================");
+            ++patternIter;
+        }
+        
+    }
+    
+    return result;
 }
 
 bool Application::checkFileEquivalence(const fs::path& source, const fs::path& dest) const {
@@ -314,6 +534,13 @@ std::pair<fs::path, fs::path> Application::getNextWriteReadPath() {
     //for () {
         
     //}
+    
+    std::cout << ".==============.\n";
+    auto vec = globPortable(readPath_);
+    for (auto& x : vec) {
+        std::cout << x << "\n";
+    }
+    std::cout << "\'==============\'\n";
     
     readPathSet_ = false;
     

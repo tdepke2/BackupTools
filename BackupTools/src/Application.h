@@ -15,6 +15,7 @@ class Application {
     static char pathSeparator;
     
     static bool fnmatchPortable(char const* pattern, char const* str);
+    static std::vector<fs::path> globPortable(const fs::path& pattern);
     bool checkFileEquivalence(const fs::path& source, const fs::path& dest) const;
     void loadFile(const fs::path& filename);
     void printPaths();
@@ -28,7 +29,6 @@ class Application {
     fs::path writePath_, readPath_;
     bool writePathSet_, readPathSet_;
     
-    static bool fnmatchPortable_(char const* pattern, char const* str);
     static void skipWhitespace(std::string::size_type& index, const std::string& str);    // Increment index while space character found in str.
     static std::string parseNextCommand(std::string::size_type& index, const std::string& str);    // Return next string in str until space found.
     static fs::path parseNextPath(std::string::size_type& index, const std::string& str);    // Return next path (considers paths wrapped in double quotes) and normalize it.

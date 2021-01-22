@@ -8,6 +8,10 @@ TEST(TestGlobbing, NoWildcards) {
     EXPECT_EQ(Application::fnmatchPortable("a", "b"), false);
     EXPECT_EQ(Application::fnmatchPortable("", "b"), false);
     EXPECT_EQ(Application::fnmatchPortable("a", ""), false);
+    EXPECT_EQ(Application::fnmatchPortable(" aslkwas  aowdsaknfal ", " awijalskd awoidwa "), false);
+    EXPECT_EQ(Application::fnmatchPortable(" aslkwas  aowdsaknfal ", " aslkwas  aowdsaknfal "), true);
+    EXPECT_EQ(Application::fnmatchPortable("`~1!2@3#4$5%6^7&89(0)-_=+{}\\|;:\'\",<.>/", "`~1!2@3#4$5%6^7&89(0)-_=+{}\\|;:\'\",<./"), false);
+    EXPECT_EQ(Application::fnmatchPortable("`~1!2@3#4$5%6^7&89(0)-_=+{}\\|;:\'\",<.>/", "`~1!2@3#4$5%6^7&89(0)-_=+{}\\|;:\'\",<.>/"), true);
     EXPECT_EQ(Application::fnmatchPortable("thiS iS a TEST", "this is a test"), false);
     EXPECT_EQ(Application::fnmatchPortable("this is a test", "thiS iS a TEST"), false);
     EXPECT_EQ(Application::fnmatchPortable("thiS iS a TEST", "thiS iS a TEST"), true);
@@ -18,16 +22,58 @@ TEST(TestGlobbing, NoWildcards) {
     EXPECT_EQ(Application::fnmatchPortable("\\path\\to\\file.txt", "\\path\\to\\file.txt"), true);
 }
 
+TEST(TestGlobbing, CommonCaseTests) {
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\file.txt", "C:\\path\\to\\file.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\file.txt", "D:\\path\\to\\file.txt"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file.txt", "C:\\really\\long\\path\\to\\a\\different kind of\\file.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file.txt", "C:\\really\\long\\path\\to\\a\\differentkind of\\file.txt"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file.txt", "C:\\really\\long\\path\\to\\a\\different kind of\\file.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file2.txt", "C:\\really\\long\\path\\to\\a\\different kind of\\file2.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file2.txt", "C:\\really\\long\\path\\to\\a\\different kind of\\file3.txt"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file3.txt", "C:\\really\\long\\path\\to\\a\\different kind of\\file3.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file4.txt", "C:\\really\\long\\path\\to\\a\\different kind of\\file5.txt"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file4.txt", "C:\\really\\long\\path\\to\\a\\different kind of\\file4.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file.txt", "C:\\"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file.txt", "C:\\really"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file.txt", "C:\\really\\long"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file.txt", "C:\\really\\long\\path"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file.txt", "C:\\really\\long\\path\\to"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file.txt", "C:\\really\\long\\path\\to\\a"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file.txt", "C:\\really\\long\\path\\to\\a\\different kind of"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file.txt", "C:\\really\\long\\path\\to\\a\\different kind of\\file.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("\\home", "\\home"), true);
+    EXPECT_EQ(Application::fnmatchPortable("\\home", "\\usr"), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\home", "\\local"), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account", "\\home\\lost+found"), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account", "\\home\\user account"), true);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account", "\\home\\temp"), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account\\documents", "\\home\\user account\\stuff"), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account\\documents", "\\home\\user account\\music"), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account\\documents", "\\home\\user account\\Open Office"), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account\\documents", "\\home\\user account\\documents"), true);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account\\documents\\*.bin", "\\home\\user account\\documents\\new text doc.txt"), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account\\documents\\*.bin", "\\home\\user account\\documents\\file"), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account\\documents\\*.bin", "\\home\\user account\\documents\\.bin"), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account\\documents\\*.bin", "\\home\\user account\\documents\\.hidden"), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account\\documents\\*.bin", "\\home\\user account\\documents\\data.bin"), true);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account\\documents\\*.bin", "\\home\\user account\\documents\\."), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\home\\user account\\documents\\*.bin", "\\home\\user account\\documents\\.."), false);
+}
+
 TEST(TestGlobbing, QuestionMark) {
     EXPECT_EQ(Application::fnmatchPortable("?", ""), false);
     EXPECT_EQ(Application::fnmatchPortable("", "?"), false);
     EXPECT_EQ(Application::fnmatchPortable("?", "?"), true);
     EXPECT_EQ(Application::fnmatchPortable("?", "a"), true);
     EXPECT_EQ(Application::fnmatchPortable("?", "x"), true);
-    EXPECT_EQ(Application::fnmatchPortable("?", "."), true);
+    EXPECT_EQ(Application::fnmatchPortable("?", "."), false);
+    EXPECT_EQ(Application::fnmatchPortable("\\?", "\\."), false);
+    EXPECT_EQ(Application::fnmatchPortable("a?", "a."), true);
+    EXPECT_EQ(Application::fnmatchPortable("\\a?\\", "\\a.\\"), true);
     EXPECT_EQ(Application::fnmatchPortable("?", "\\"), false);
     EXPECT_EQ(Application::fnmatchPortable("?", "["), true);
     EXPECT_EQ(Application::fnmatchPortable("?", "]"), true);
+    EXPECT_EQ(Application::fnmatchPortable("a?", "a"), false);
     EXPECT_EQ(Application::fnmatchPortable("a?", "ab"), true);
     EXPECT_EQ(Application::fnmatchPortable("this is a tes?", "this is a tes"), false);
     EXPECT_EQ(Application::fnmatchPortable("?hi???s ??te?t", "this is a test"), true);
@@ -40,6 +86,7 @@ TEST(TestGlobbing, QuestionMark) {
     EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to?file.txt", "C:\\path\\to\\file.txt"), false);
     EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to?file.txt", "C:\\path\\to?file.txt"), true);
     EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\file?txt", "C:\\path\\to\\file.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\?file", "C:\\path\\to\\.file"), false);
 }
 
 TEST(TestGlobbing, Star) {
@@ -47,6 +94,11 @@ TEST(TestGlobbing, Star) {
     EXPECT_EQ(Application::fnmatchPortable("*", ""), true);
     EXPECT_EQ(Application::fnmatchPortable("*", "*"), true);
     EXPECT_EQ(Application::fnmatchPortable("", "*"), false);
+    EXPECT_EQ(Application::fnmatchPortable("a*", "a"), true);
+    EXPECT_EQ(Application::fnmatchPortable("a*b", "ab"), true);
+    EXPECT_EQ(Application::fnmatchPortable("a*b", "acb"), true);
+    EXPECT_EQ(Application::fnmatchPortable("a*b", "abc"), false);
+    EXPECT_EQ(Application::fnmatchPortable("a*b*", "abc"), true);
     EXPECT_EQ(Application::fnmatchPortable("*", "Bunch OF random text"), true);
     EXPECT_EQ(Application::fnmatchPortable("*", "Bunch OF random text."), true);
     EXPECT_EQ(Application::fnmatchPortable("*", ".Bunch OF random text."), false);
@@ -54,10 +106,16 @@ TEST(TestGlobbing, Star) {
     EXPECT_EQ(Application::fnmatchPortable(".*", ".Bunch OF random text."), true);
     EXPECT_EQ(Application::fnmatchPortable(".*", ".Bunch OF random text"), true);
     EXPECT_EQ(Application::fnmatchPortable(".*", "Bunch OF random text"), false);
+    EXPECT_EQ(Application::fnmatchPortable(".*", "Bunch OF random text."), false);
+    EXPECT_EQ(Application::fnmatchPortable("*.*", "Bunch OF random text"), false);
+    EXPECT_EQ(Application::fnmatchPortable("*.*", "Bunch OF random text."), true);
+    EXPECT_EQ(Application::fnmatchPortable("*.*", "Bunch OF random.text"), true);
+    EXPECT_EQ(Application::fnmatchPortable("*.*", ".Bunch OF random text"), false);
     EXPECT_EQ(Application::fnmatchPortable("*", "a.............."), true);
     EXPECT_EQ(Application::fnmatchPortable("app*", "apple"), true);
     EXPECT_EQ(Application::fnmatchPortable("app*", "appl"), true);
     EXPECT_EQ(Application::fnmatchPortable("app*", "app"), true);
+    EXPECT_EQ(Application::fnmatchPortable("app*", "ap"), false);
     EXPECT_EQ(Application::fnmatchPortable("ap*le", "apple"), true);
     EXPECT_EQ(Application::fnmatchPortable("ap*le", "apshf soasdfle"), true);
     EXPECT_EQ(Application::fnmatchPortable("ap*le", "apshf soasdflge"), false);
@@ -81,11 +139,17 @@ TEST(TestGlobbing, Star) {
     EXPECT_EQ(Application::fnmatchPortable("\\*", "\\home"), true);
     EXPECT_EQ(Application::fnmatchPortable("\\*", "\\.home"), false);
     EXPECT_EQ(Application::fnmatchPortable("\\.*", "\\.home"), true);
-    //EXPECT_EQ(Application::fnmatchPortable("\\*.", "\\."), false);    // This does not pass, but is how standard UNIX glob behaves. No idea why though, maybe because missing file ext?
+    EXPECT_EQ(Application::fnmatchPortable("\\*.", "\\."), false);
     EXPECT_EQ(Application::fnmatchPortable("*", ".test"), false);
+    EXPECT_EQ(Application::fnmatchPortable("*", "test"), true);
     EXPECT_EQ(Application::fnmatchPortable(".*", ".test"), true);
-    EXPECT_EQ(Application::fnmatchPortable("*.", "."), true);    // Similar to previous exception on UNIX.
+    EXPECT_EQ(Application::fnmatchPortable(".*", "test"), false);
+    EXPECT_EQ(Application::fnmatchPortable("*.", "."), false);
+    EXPECT_EQ(Application::fnmatchPortable("*.", "a."), true);
     EXPECT_EQ(Application::fnmatchPortable(".", ".test"), false);
+    EXPECT_EQ(Application::fnmatchPortable("*", "."), false);
+    EXPECT_EQ(Application::fnmatchPortable("*", ".."), false);
+    EXPECT_EQ(Application::fnmatchPortable("*", "test.dat"), true);
     
     // Multiple star.
     EXPECT_EQ(Application::fnmatchPortable("**", ""), true);
@@ -101,21 +165,31 @@ TEST(TestGlobbing, Star) {
     EXPECT_EQ(Application::fnmatchPortable("h****o*wo**d**r***", "hello world"), false);
     EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\******.txt", "C:\\path\\to\\file.txt"), true);
     EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\******txt", "C:\\path\\to\\.txt"), false);
-    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\******.txt", "C:\\path\\to\\.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\******.txt", "C:\\path\\to\\.txt"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\******txt", "C:\\path\\to\\txt"), true);
     EXPECT_EQ(Application::fnmatchPortable("***", ".test"), false);
     EXPECT_EQ(Application::fnmatchPortable(".***", ".test"), true);
-    EXPECT_EQ(Application::fnmatchPortable("***.", "."), true);
+    EXPECT_EQ(Application::fnmatchPortable("***.", "."), false);
+    EXPECT_EQ(Application::fnmatchPortable("***.", ".."), false);
+    EXPECT_EQ(Application::fnmatchPortable("***.", "a."), true);
 }
 
 TEST(TestGlobbing, Brackets) {
     // No ranges.
     EXPECT_EQ(Application::fnmatchPortable("[", ""), false);
+    EXPECT_EQ(Application::fnmatchPortable("[", "x"), false);
     EXPECT_EQ(Application::fnmatchPortable("[", "["), true);
     EXPECT_EQ(Application::fnmatchPortable("]", ""), false);
+    EXPECT_EQ(Application::fnmatchPortable("]", "x"), false);
     EXPECT_EQ(Application::fnmatchPortable("]", "]"), true);
     EXPECT_EQ(Application::fnmatchPortable("[]", ""), false);
     EXPECT_EQ(Application::fnmatchPortable("[]", "a"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[]", "ab"), false);
     EXPECT_EQ(Application::fnmatchPortable("[]", "[]"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[]hello", ""), false);
+    EXPECT_EQ(Application::fnmatchPortable("[]hello", "[]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[]hello", "hello"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[]hello", "[]hello"), true);
     EXPECT_EQ(Application::fnmatchPortable("[a]", ""), false);
     EXPECT_EQ(Application::fnmatchPortable("[a]", "a"), true);
     EXPECT_EQ(Application::fnmatchPortable("[ ]", " "), true);
@@ -124,22 +198,130 @@ TEST(TestGlobbing, Brackets) {
     EXPECT_EQ(Application::fnmatchPortable("[asjwGDr]", "r"), true);
     EXPECT_EQ(Application::fnmatchPortable("[asjwGDr]", "h"), false);
     EXPECT_EQ(Application::fnmatchPortable("[asjwGDr]", "g"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[asjwGDr", "G"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[asjwGDr", "a"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[asjwGDr", "r"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[asjwGDr", "[asjwGDr"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[asjwGDr", "asjwGDr"), false);
     EXPECT_EQ(Application::fnmatchPortable("[][]", "["), true);
     EXPECT_EQ(Application::fnmatchPortable("[][]", "]"), true);
     EXPECT_EQ(Application::fnmatchPortable("[][]", "[]"), false);
     EXPECT_EQ(Application::fnmatchPortable("[[]]", "["), false);
     EXPECT_EQ(Application::fnmatchPortable("[[]]", "]"), false);
     EXPECT_EQ(Application::fnmatchPortable("[[]]", "[]"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[[]", "["), true);
+    EXPECT_EQ(Application::fnmatchPortable("[[]", "]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[[]", "[[]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[]]", "["), false);
+    EXPECT_EQ(Application::fnmatchPortable("[]]", "]"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[]]", "[]]"), false);
     EXPECT_EQ(Application::fnmatchPortable("[a][]", "["), false);
     EXPECT_EQ(Application::fnmatchPortable("[a][]", "a[]"), true);
     EXPECT_EQ(Application::fnmatchPortable("[][b]", "["), true);
     EXPECT_EQ(Application::fnmatchPortable("[][b]", "b"), true);
     EXPECT_EQ(Application::fnmatchPortable("[][b]", "]"), true);
     EXPECT_EQ(Application::fnmatchPortable("[][b]", "[]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[ab][cd]", "[ab][cd]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[ab][cd]", "]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[ab][cd]", "abcd"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[ab][cd]", "ac"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[ab][cd]", "ab"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[ab][cd]", "bc"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[ab][cd]", "bd"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[ab][cd]", "ad"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[ab][cd]", "cd"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[ab][cd]", "da"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[[[[[[[[[", "["), false);
+    EXPECT_EQ(Application::fnmatchPortable("[[[[[[[[[", "[[[[[[[[["), true);
+    EXPECT_EQ(Application::fnmatchPortable("]]]]]]]]]", "]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("]]]]]]]]]", "]]]]]]]]]"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!a]", ""), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^a]", ""), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!a]", "a"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^a]", "a"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!a]", "b"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[^a]", "b"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[a!]", "a"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[a^]", "a"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[a!]", "!"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[a^]", "^"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!^]", "^"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!^]", "g"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[^!]", "!"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^!]", "g"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!asjwGDr]", "G"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!asjwGDr]", "a"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!asjwGDr]", "r"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!asjwGDr]", "h"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!asjwGDr]", "g"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!asjwGDr", "h"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!asjwGDr", "[!asjwGDr"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!asjwGDr", "[asjwGDr"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\[f]ile.txt", "C:\\path\\to\\file.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\[f]ile.txt", "C:\\path\\to\\aile.txt"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\[!f]ile.txt", "C:\\path\\to\\aile.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\[file][file][file][file].txt", "C:\\path\\to\\file.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\[file][file][file][file].txt", "C:\\path\\to\\life.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to[\\]file.txt", "C:\\path\\to\\file.txt"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\[f\\]ile.txt", "C:\\path\\to\\file.txt"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\[\\f]ile.txt", "C:\\path\\to\\file.txt"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\[f\\]ile.txt", "C:\\path\\to\\[f\\]ile.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\file[.]txt", "C:\\path\\to\\file.txt"), true);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\file[.]txt", "C:\\path\\to\\filetxt"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\[.]file", "C:\\path\\to\\.file"), true);    // The standard unix glob does not support this, but it seems like a good idea since brace expansion is not a feature of this function.
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\[!.]file", "C:\\path\\to\\.file"), false);
+    EXPECT_EQ(Application::fnmatchPortable("C:\\path\\to\\[!.]file", "C:\\path\\to\\afile"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[.]file", ".file"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[.]file", "file"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!.]file", ".file"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!.]file", "afile"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!", "!"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!", "x"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!", "[!"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[^", "^"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^", "x"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^", "[^"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!]", "!"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!]", "x"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!]", "["), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!]", "]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!]", "[!]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!]x", "x"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!]x", "[!]x"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!]x", "!x"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!]x", "^x"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^]", "^"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[^]", "x"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^]", "["), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^]", "]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^]", "[^]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^]x", "x"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^]x", "[^]x"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^]x", "^x"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[^]x", "!x"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!]]", "!"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!]]", "]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!]]", "x"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!]abcdef]", "!"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!]abcdef]", "]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!]abcdef]", "x"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!]abcdef]", "a"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!]abcdef]", "f"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!!]", "[!!]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!!]", "!"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[!!]", "^"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[!!]", "]"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[^^]", "[^^]"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^^]", "^"), false);
+    EXPECT_EQ(Application::fnmatchPortable("[^^]", "!"), true);
+    EXPECT_EQ(Application::fnmatchPortable("[^^]", "]"), true);
     
     // Ranges.
 }
 
 TEST(TestGlobbing, Comprehensive) {
+    // These take some time, but are also very rare edge cases that do not need to be optimized.
     EXPECT_EQ(Application::fnmatchPortable("*a*??????*a*?????????a???????????????", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), true);
+    EXPECT_EQ(Application::fnmatchPortable("*a*??????*a*?????????a???????????????", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabaaaaaaaaaaaaaaa"), false);
+    EXPECT_EQ(Application::fnmatchPortable("*a*??????*a*?????????a???????????????", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabaaaaaaaaaaaaaa"), true);
 }
