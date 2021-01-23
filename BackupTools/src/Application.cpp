@@ -67,7 +67,16 @@ bool fnmatchSimple_(char const* pattern, char const* str) {
                 } else if (*endingBracket == ']') {
                     bool matchedChar = false;
                     while (pattern != endingBracket) {    // Traverse to bracket again and check for a match.
-                        if (*pattern == *str) {
+                        if (*(pattern + 1) == '-' && pattern + 2 != endingBracket) {    // Check for characters between range (left character must not be greater than right).
+                            char c = *pattern;
+                            pattern += 2;
+                            while (c <= *pattern) {
+                                if (c == *str) {
+                                    matchedChar = true;
+                                }
+                                ++c;
+                            }
+                        } else if (*pattern == *str) {
                             matchedChar = true;
                         }
                         ++pattern;
@@ -95,7 +104,7 @@ bool fnmatchSimple_(char const* pattern, char const* str) {
     return *pattern == '\0' || *pattern == Application::pathSeparator;
 }
 
-// Alternative fnmatch version for cases with either no path separators, or path separators only at the end of pattern and str.
+// Alternative fnmatch version for cases with either no path separators, or path separators only at the end of pattern and str. Called by fnmatchPortable().
 bool fnmatchSimple(char const* pattern, char const* str) {
     // Star does not match a leading dot in a name (because it's not supposed to match hidden files or the . and .. directories). Question mark does not match a leading dot in a name.
     if ((*pattern == '*' && *str == '.') || (*pattern == '?' && *str == '.')) {
