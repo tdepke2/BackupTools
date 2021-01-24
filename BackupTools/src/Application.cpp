@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cctype>
 #include <iostream>
+#include <stack>
 #include <stdexcept>
 
 char Application::pathSeparator = std::filesystem::path::preferred_separator;
@@ -150,12 +151,9 @@ bool Application::fnmatchPortable(char const* pattern, char const* str) {
 }
 
 std::vector<fs::path> Application::globPortable(const fs::path& pattern) {
-    //const fs::path current = fs::current_path();
-    
     std::vector<fs::path> result;
     
     auto patternIter = pattern.begin();
-    //auto currentIter = current.begin();
     if (pattern.root_directory().empty()) {    // Check if pattern is relative.
         result.push_back("relative");
     } else {    // Pattern is absolute.
@@ -166,24 +164,41 @@ std::vector<fs::path> Application::globPortable(const fs::path& pattern) {
         if (pattern.has_root_name()) {    // Skip root name.
             ++patternIter;
         }
+        if (patternIter == pattern.end()) {
+            return result;
+        }
         ++patternIter;    // Skip root directory.
         
-        
-        
-        fs::path patternTraversal = pattern.root_path();
-        while (patternIter != pattern.end()) {
-            for (const auto& entry : fs::directory_iterator(patternTraversal)) {
-                if (entry.path().filename() == *patternIter) {
-                    result.push_back(patternTraversal / *patternIter);
-                }
-                //result.push_back(entry.path().filename());
+        std::stack<fs::path> pathStack;
+        pathStack.push(pattern.root_path());
+        std::stack<fs::path::iterator> iterStack;
+        iterStack.push(patternIter);
+        while (!pathStack.empty()) {
+            fs::path pathTraversal = pathStack.top();
+            pathStack.pop();
+            fs::path::iterator currentPatternIter = iterStack.top();
+            iterStack.pop();
+            
+            if (currentPatternIter == pattern.end()) {
+                break;
             }
             
-            patternTraversal /= *patternIter;
-            result.push_back("============================");
-            ++patternIter;
+            std::cout << "Current sub-pattern is " << *currentPatternIter << "\n";
+            fs::path::iterator nextPatternIter = std::next(currentPatternIter);
+            
+            for (const auto& entry : fs::directory_iterator(pathTraversal)) {
+                if (fnmatchSimple(currentPatternIter->string().c_str(), entry.path().filename().string().c_str())) {
+                    pathStack.push(pathTraversal / entry.path().filename());
+                    std::cout << pathStack.top() << "\n";
+                    if (nextPatternIter == pattern.end()) {
+                        result.push_back(pathStack.top());
+                    }
+                    iterStack.push(nextPatternIter);
+                }
+            }
+            
+            std::cout << "============================\n";
         }
-        
     }
     
     return result;
@@ -410,12 +425,9 @@ std::pair<fs::path, fs::path> Application::getNextWriteReadPath() {
         parseNextLineInFile();
     }
     
-    //for () {
-        
-    //}
-    
     std::cout << ".==============.\n";
     auto vec = globPortable(readPath_);
+    std::cout << "results:\n";
     for (auto& x : vec) {
         std::cout << x << "\n";
     }
