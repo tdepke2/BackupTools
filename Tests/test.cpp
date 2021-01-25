@@ -2,6 +2,10 @@
 #include "pch.h"
 #include "../BackupTools/src/Application.h"
 
+// ****************************************************************************
+// * TestGlobbing                                                             *
+// ****************************************************************************
+
 TEST(TestGlobbing, NoWildcards) {
     EXPECT_EQ(Application::fnmatchPortable("", ""), true);
     EXPECT_EQ(Application::fnmatchPortable("a", "a"), true);
@@ -471,4 +475,28 @@ TEST(TestGlobbing, Comprehensive) {
     EXPECT_EQ(Application::fnmatchPortable("*a*??????*a*?????????a???????????????", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), true);
     EXPECT_EQ(Application::fnmatchPortable("*a*??????*a*?????????a???????????????", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabaaaaaaaaaaaaaaa"), false);
     EXPECT_EQ(Application::fnmatchPortable("*a*??????*a*?????????a???????????????", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabaaaaaaaaaaaaaa"), true);
+}
+
+// ****************************************************************************
+// * TestContainsWildcard                                                     *
+// ****************************************************************************
+
+TEST(TestContainsWildcard, Test1) {
+    EXPECT_EQ(Application::containsWildcard(""), false);
+    EXPECT_EQ(Application::containsWildcard("a"), false);
+    EXPECT_EQ(Application::containsWildcard("*"), true);
+    EXPECT_EQ(Application::containsWildcard("?"), true);
+    EXPECT_EQ(Application::containsWildcard("."), false);
+    EXPECT_EQ(Application::containsWildcard("["), false);
+    EXPECT_EQ(Application::containsWildcard("[*"), true);
+    EXPECT_EQ(Application::containsWildcard("[]"), false);
+    EXPECT_EQ(Application::containsWildcard("[]]"), true);
+    EXPECT_EQ(Application::containsWildcard("[[]"), true);
+    EXPECT_EQ(Application::containsWildcard("[a]"), true);
+    EXPECT_EQ(Application::containsWildcard("[abc "), false);
+    EXPECT_EQ(Application::containsWildcard("[abc] "), true);
+    EXPECT_EQ(Application::containsWildcard("?[!!-@]*g[a-zA-Z0-9]"), true);
+    EXPECT_EQ(Application::containsWildcard("`~1!2@3#4$5%6^7&89(0)-_=+{}\\|;:\'\",<.>/"), false);
+    EXPECT_EQ(Application::containsWildcard("C:\\path\\to\\file.txt"), false);
+    EXPECT_EQ(Application::containsWildcard("C:\\path\\to\\*.txt"), true);
 }

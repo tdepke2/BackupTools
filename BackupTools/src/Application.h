@@ -14,7 +14,8 @@ class Application {
     public:
     static char pathSeparator;
     
-    static bool fnmatchPortable(char const* pattern, char const* str);
+    static bool fnmatchPortable(char const* pattern, char const* str);    // Implementation of the unix fnmatch(3) function. More details in .cpp file.
+    static bool containsWildcard(char const* pattern);    // Determines if a string contains glob wildcards.
     static std::vector<fs::path> globPortable(const fs::path& pattern);
     bool checkFileEquivalence(const fs::path& source, const fs::path& dest) const;
     void loadFile(const fs::path& filename);

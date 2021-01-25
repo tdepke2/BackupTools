@@ -2,7 +2,7 @@ root x dest
 
 in "x/" add "source/a.txt"
 in x/ add source/*
-in x/ add "C:\Users\Thomas Depke\Documents\Visual Studio 2017\Projects\BackupTools\*"
+in x/ add "C:\Users\Thomas Depke\Documents\Visual Studio 2017\Projects\BackupTools\BackupTools"
 
 ignore *.exe
 
