@@ -1,15 +1,23 @@
 root x dest
 
-in "x/" add "source/a.txt"
-in x/ add source/*
-in x/ add "C:\Users\Thomas Depke\Documents\Visual Studio 2017\Projects\BackupTools\BackupTools"
+# Add all in current directory.
+#in "x" add ""
+#in "x" add **
+
+# Add files in current directory.
+#in x add *
+
+# Add only .txt files in the project files.
+#in x/ add "C:\Users\Thomas Depke\Documents\Visual Studio 2017\Projects\BackupTools\**\*.txt"
+
+in x add source/**
 
 ignore *.exe
 
 # comment
 
-in x/ 
-    add source/*    
+#in x 
+#    add ""    
 
  include *.exe
 

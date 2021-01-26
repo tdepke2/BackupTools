@@ -16,7 +16,7 @@ class Application {
     
     static bool fnmatchPortable(char const* pattern, char const* str);    // Implementation of the unix fnmatch(3) function. More details in .cpp file.
     static bool containsWildcard(char const* pattern);    // Determines if a string contains glob wildcards.
-    static std::vector<fs::path> globPortable(const fs::path& pattern);
+    static std::vector<std::pair<fs::path, fs::path>> globPortable(fs::path pattern);    // Returns a list of absolute/local paths that match the pattern. The pattern must be in normal form.
     bool checkFileEquivalence(const fs::path& source, const fs::path& dest) const;
     void loadFile(const fs::path& filename);
     void printPaths();
