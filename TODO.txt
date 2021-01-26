@@ -1,0 +1,5 @@
+Fixes:
+    * globPortable() should respect already matched paths in previousReadPaths_ and ignore paths in ignorePaths_.
+
+Additions:
+    * Add option to include hidden files with ? and *.
