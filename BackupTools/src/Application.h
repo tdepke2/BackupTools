@@ -10,6 +10,14 @@
 
 namespace fs = std::filesystem;
 
+struct WriteReadPath {
+    fs::path writePath;
+    fs::path readAbsolute;
+    fs::path readLocal;
+    
+    bool isEmpty() const { return readAbsolute.empty(); }
+};
+
 class Application {
     public:
     static char pathSeparator;
@@ -23,10 +31,13 @@ class Application {
     
     private:
     std::ifstream configFile_;
+    fs::path configFilename_;
     unsigned int lineNumber_;
     std::map<fs::path, fs::path> rootPaths_;
     std::set<fs::path> ignorePaths_;
     std::set<fs::path> previousReadPaths_;
+    std::vector<std::pair<fs::path, fs::path>> globPortableResults_;
+    size_t globPortableResultsIndex_;
     fs::path writePath_, readPath_;
     bool writePathSet_, readPathSet_;
     
@@ -35,7 +46,7 @@ class Application {
     static fs::path parseNextPath(std::string::size_type& index, const std::string& str);    // Return next path (considers paths wrapped in double quotes) and normalize it.
     fs::path substituteRootPath(const fs::path& path);    // Substitute the path root for a match in rootPaths_ if applicable.
     void parseNextLineInFile();    // Read next line in configFile_ (if no more lines, closes the file). Sets writePath_ and readPath_.
-    std::pair<fs::path, fs::path> getNextWriteReadPath();    // Get the next write/read combination from configFile_, or return empty paths if none left. Returned paths are stripped of regex and read path is unique and not contained in ignorePaths_.
+    WriteReadPath getNextWriteReadPath();    // Get the next write/read combination from configFile_, or return empty paths if none left. Returned paths are stripped of regex and read path is unique and not contained in ignorePaths_.
 };
 
 #endif
