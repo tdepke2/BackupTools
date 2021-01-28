@@ -14,6 +14,11 @@ int main(int argc, char** argv) {
     //std::cout << "app.checkFileEquivalence = " << result << "\n";
     
     app.printPaths("sample.txt");
+    std::cout << "\n";
+    app.checkBackup("sample.txt");
+    std::cout << "\n";
+    app.startBackup("sample.txt");
+    std::cout << "\n";
     
     return 0;
 }

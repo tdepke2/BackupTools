@@ -275,7 +275,7 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
     return result;
 }
 
-bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& dest) const {
+bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& dest) {
     /*std::uintmax_t sourceSize, destSize;
     try {
         sourceSize = fs::file_size(source);
