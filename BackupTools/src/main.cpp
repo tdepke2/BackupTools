@@ -15,9 +15,9 @@ int main(int argc, char** argv) {
     
     app.printPaths("sample.txt");
     std::cout << "\n";
-    app.checkBackup("sample.txt");
-    std::cout << "\n";
-    app.startBackup("sample.txt");
+    //app.checkBackup("sample.txt");
+    //std::cout << "\n";
+    app.startBackup("sample.txt", false);
     std::cout << "\n";
     
     return 0;
