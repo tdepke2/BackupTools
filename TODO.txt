@@ -3,3 +3,4 @@ Fixes:
 
 Additions:
     * Add option to include hidden files with ? and *.
+    * Catch SIGINT to gracefully stop.

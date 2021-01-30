@@ -275,21 +275,7 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
     return result;
 }
 
-bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& dest) {
-    /*std::uintmax_t sourceSize, destSize;
-    try {
-        sourceSize = fs::file_size(source);
-        destSize = fs::file_size(dest);
-    } catch(...) {
-        return false;
-    }
-    if (sourceSize != destSize) {
-        return false;
-    }
-    
-    std::cout << "Sizes match, checking equivalence...\n";
-    return ;*/
-    
+bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& dest) {    // Based on https://stackoverflow.com/questions/15118661/in-c-whats-the-fastest-way-to-tell-whether-two-string-or-binary-files-are-di
     std::ifstream sourceFile(source, std::ios::ate | std::ios::binary);    // Open files in binary mode and seek to end.
     std::ifstream destFile(dest, std::ios::ate | std::ios::binary);
     if (!sourceFile.is_open() || !destFile.is_open()) {
@@ -297,7 +283,6 @@ bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& d
     }
     const std::ios::pos_type sourceSize = sourceFile.tellg();    // Find file sizes.
     const std::ios::pos_type destSize = destFile.tellg();
-    std::cout << "Size 1 = " << sourceSize << ", Size 2 = " << destSize << "\n";
     if (sourceSize != destSize) {
         return false;
     }
@@ -309,6 +294,45 @@ bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& d
     std::istreambuf_iterator<char> destIter(destFile);
     
     return std::equal(sourceIter, std::istreambuf_iterator<char>(), destIter);    // Compare streams to check for equality (both streams are same length so this is safe).
+}
+
+void FileHandler::skipWhitespace(std::string::size_type& index, const std::string& str) {
+    while (index < str.length() && str[index] == ' ') {
+        ++index;
+    }
+}
+
+std::string FileHandler::parseNextWord(std::string::size_type& index, const std::string& str) {
+    std::string::size_type start = index;
+    while (index < str.length()) {
+        if (str[index] == ' ') {
+            return str.substr(start, index - start);
+        }
+        ++index;
+    }
+    return str.substr(start);
+}
+
+fs::path FileHandler::parseNextPath(std::string::size_type& index, const std::string& str) {
+    std::string::size_type start = index;
+    if (index < str.length() && str[index] == '\"') {
+        ++index;
+        while (index < str.length()) {
+            if (str[index] == '\"') {
+                ++index;
+                return fs::path(str.substr(start + 1, index - start - 2)).lexically_normal();
+            }
+            ++index;
+        }
+    } else {
+        while (index < str.length()) {
+            if (str[index] == ' ') {
+                return fs::path(str.substr(start, index - start)).lexically_normal();
+            }
+            ++index;
+        }
+    }
+    return fs::path(str.substr(start)).lexically_normal();
 }
 
 void FileHandler::loadConfigFile(const fs::path& filename) {
@@ -361,45 +385,6 @@ WriteReadPath FileHandler::getNextWriteReadPath() {
     return result;
 }
 
-void FileHandler::skipWhitespace(std::string::size_type& index, const std::string& str) {
-    while (index < str.length() && str[index] == ' ') {
-        ++index;
-    }
-}
-
-std::string FileHandler::parseNextCommand(std::string::size_type& index, const std::string& str) {
-    std::string::size_type start = index;
-    while (index < str.length()) {
-        if (str[index] == ' ') {
-            return str.substr(start, index - start);
-        }
-        ++index;
-    }
-    return str.substr(start);
-}
-
-fs::path FileHandler::parseNextPath(std::string::size_type& index, const std::string& str) {
-    std::string::size_type start = index;
-    if (index < str.length() && str[index] == '\"') {
-        ++index;
-        while (index < str.length()) {
-            if (str[index] == '\"') {
-                ++index;
-                return fs::path(str.substr(start + 1, index - start - 2)).lexically_normal();
-            }
-            ++index;
-        }
-    } else {
-        while (index < str.length()) {
-            if (str[index] == ' ') {
-                return fs::path(str.substr(start, index - start)).lexically_normal();
-            }
-            ++index;
-        }
-    }
-    return fs::path(str.substr(start)).lexically_normal();
-}
-
 fs::path FileHandler::substituteRootPath(const fs::path& path) {
     auto pathIter = path.begin();
     if (pathIter != path.end()) {
@@ -439,9 +424,9 @@ void FileHandler::parseNextLineInFile() {
             return;
         }
         
-        std::string command = parseNextCommand(index, line);
+        std::string command = parseNextWord(index, line);
+        skipWhitespace(index, line);
         if (command == "root") {    // Syntax: root <identifier> <replacement path>
-            skipWhitespace(index, line);
             if (index >= line.length()) {
                 throw std::runtime_error("Missing identifier path parameter.");
             }
@@ -455,7 +440,6 @@ void FileHandler::parseNextLineInFile() {
             
             rootPaths_.insert({keyPath, valuePath});
         } else if (command == "in") {    // Syntax: in <write path> [add <read path>]
-            skipWhitespace(index, line);
             if (index >= line.length()) {
                 throw std::runtime_error("Missing write path parameter.");
             }
@@ -463,7 +447,7 @@ void FileHandler::parseNextLineInFile() {
             writePathSet_ = true;
             skipWhitespace(index, line);
             if (index < line.length()) {
-                command = parseNextCommand(index, line);
+                command = parseNextWord(index, line);
                 if (command != "add") {
                     throw std::runtime_error("Unexpected command \"" + command + "\" after \"in <write path>\".");
                 }
@@ -477,7 +461,6 @@ void FileHandler::parseNextLineInFile() {
                 //std::cout << "    In: [" << writePath_ << "] [" << readPath_ << "]\n";
             }
         } else if (command == "add") {    // Syntax (write path must have previously been set): add <read path>
-            skipWhitespace(index, line);
             if (!writePathSet_) {
                 throw std::runtime_error("Missing previous call to \"in <write path>\".");
             }
@@ -489,7 +472,6 @@ void FileHandler::parseNextLineInFile() {
             
             //std::cout << "    Add: [" << writePath_ << "] [" << readPath_ << "]\n";
         } else if (command == "ignore") {    // Syntax: ignore <path>
-            skipWhitespace(index, line);
             if (index >= line.length()) {
                 throw std::runtime_error("Missing ignore path parameter.");
             }
@@ -499,7 +481,6 @@ void FileHandler::parseNextLineInFile() {
             
             ignorePaths_.insert(ignorePath);
         } else if (command == "include") {    // Syntax: include <path>
-            skipWhitespace(index, line);
             if (index >= line.length()) {
                 throw std::runtime_error("Missing include path parameter.");
             }
