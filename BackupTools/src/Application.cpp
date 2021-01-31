@@ -15,7 +15,7 @@ bool Application::checkUserConfirmation() {
     inputCleaned.reserve(input.size());
     for (char c : input) {
         if (c != ' ') {
-            inputCleaned.push_back(std::tolower(c));
+            inputCleaned.push_back(std::tolower(static_cast<unsigned char>(c)));
         }
     }
     if (inputCleaned == "y" || inputCleaned == "yee" || inputCleaned == "yes" || inputCleaned == "yeah") {
@@ -25,11 +25,38 @@ bool Application::checkUserConfirmation() {
 }
 
 void Application::printPaths(const fs::path& configFilename) {
-    std::cout << "printPaths():\n";
+    std::map<fs::path, fs::path> readPathsMapping;
+    std::string longestParentPath;
+    std::set<fs::path> rootPaths;
     fileHandler_.loadConfigFile(configFilename);
-    for (WriteReadPath nextPath = fileHandler_.getNextWriteReadPath(); !nextPath.isEmpty(); nextPath = fileHandler_.getNextWriteReadPath()) {
-        std::cout << "[" << nextPath.writePath << "] ->\n";
-        std::cout << "    [" << nextPath.readAbsolute << "]   [" << nextPath.readLocal << "]\n";
+    
+    WriteReadPath nextPath = fileHandler_.getNextWriteReadPath();
+    longestParentPath = nextPath.readAbsolute.parent_path().string();
+    rootPaths.emplace(nextPath.readAbsolute.root_path());
+    while (!nextPath.isEmpty()) {
+        if (!readPathsMapping.emplace(nextPath.readAbsolute, nextPath.writePath).second) {
+            std::cout << "Warn: Skipping duplicate read path " << nextPath.readAbsolute << ".\n";
+        }
+        if (longestParentPath != nextPath.readAbsolute.parent_path().string().substr(0, longestParentPath.size())) {    // Update longestParentPath.
+            std::string currentParentPath = nextPath.readAbsolute.parent_path().string();
+            for (size_t i = 0; i < longestParentPath.size(); ++i) {
+                if (i >= currentParentPath.size()) {
+                    longestParentPath = currentParentPath;
+                    break;
+                } else if (longestParentPath[i] != currentParentPath[i]) {
+                    longestParentPath = currentParentPath.substr(0, i);
+                }
+            }
+        }
+        rootPaths.emplace(nextPath.readAbsolute.root_path());
+        
+        nextPath = fileHandler_.getNextWriteReadPath();
+    }
+    
+    
+    std::cout << "longestParentPath = " << longestParentPath << "\n";
+    for (const auto& keyVal : readPathsMapping) {
+        std::cout << keyVal.first << " ->\n    " << keyVal.second << "\n";
     }
 }
 
@@ -37,15 +64,14 @@ std::pair<bool, std::vector<fs::path>> Application::checkBackup(const fs::path& 
     std::vector<fs::path> pathDeletions, pathAdditions, pathModifications;
     std::map<fs::path, std::set<fs::path>> writePathsChecklist;
     auto lastWritePathIter = writePathsChecklist.end();
-    std::cout << "checkBackup():\n";
     fileHandler_.loadConfigFile(configFilename);
     
     for (WriteReadPath nextPath = fileHandler_.getNextWriteReadPath(); !nextPath.isEmpty(); nextPath = fileHandler_.getNextWriteReadPath()) {
         if (lastWritePathIter == writePathsChecklist.end() || lastWritePathIter->first != nextPath.writePath) {
-            auto insertResult = writePathsChecklist.insert({nextPath.writePath, {}});
+            auto insertResult = writePathsChecklist.emplace(nextPath.writePath, std::set<fs::path>());
             if (insertResult.second) {
                 for (const auto& entry : fs::recursive_directory_iterator(nextPath.writePath)) {
-                    insertResult.first->second.insert(entry.path());
+                    insertResult.first->second.emplace(entry.path());
                 }
             }
             
@@ -117,7 +143,6 @@ void Application::startBackup(const fs::path& configFilename, bool forceBackup) 
         }
     }
     
-    std::cout << "startBackup():\n";
     for (size_t i = checkBackupResult.second.size(); i > 0;) {
         --i;
         std::cout << "Removing " << checkBackupResult.second[i] << "\n";
@@ -135,4 +160,29 @@ void Application::startBackup(const fs::path& configFilename, bool forceBackup) 
 
 void Application::restoreFromBackup(const fs::path& configFilename) {
     
+}
+
+void Application::printTree(const fs::path& searchPath) {
+    if (!fs::exists(searchPath)) {
+        throw std::runtime_error("\"" + searchPath.string() + "\": Unable to find path.");
+    }
+    std::cout << searchPath.string() << "\n";
+    printTree2(searchPath, 0);
+}
+
+void Application::printTree2(const fs::path& searchPath, int recursionLevel) {
+    std::vector<fs::directory_entry> searchContents;
+    for (const auto& entry : fs::directory_iterator(searchPath)) {
+        searchContents.emplace_back(entry);
+    }
+    std::sort(searchContents.begin(), searchContents.end(), CompareFilename());
+    for (const auto& entry : searchContents) {
+        for (int i = 0; i < recursionLevel; ++i) {
+            std::cout << "|   ";
+        }
+        std::cout << "|---" << entry.path().filename().string() << "\n";
+        if (entry.is_directory()) {
+            printTree2(entry.path(), recursionLevel + 1);
+        }
+    }
 }

@@ -10,6 +10,10 @@
 
 namespace fs = std::filesystem;
 
+struct CompareFilename {
+    bool operator()(const fs::path& lhs, const fs::path& rhs);
+};
+
 struct WriteReadPath {
     fs::path writePath;
     fs::path readAbsolute;

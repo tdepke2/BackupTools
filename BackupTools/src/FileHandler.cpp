@@ -2,10 +2,22 @@
 #include <algorithm>
 #include <cctype>
 #include <iostream>
+#include <limits>
+#include <numeric>
 #include <stack>
 #include <stdexcept>
 
 char FileHandler::pathSeparator = std::filesystem::path::preferred_separator;
+
+bool CompareFilename::operator()(const fs::path& lhs, const fs::path& rhs) {
+    // Alternative method for cases like "lowercase must be sorted before uppercase" is to use collation table. https://stackoverflow.com/questions/19509110/sorting-a-string-with-stdsort-so-that-capital-letters-come-after-lower-case
+    const std::string lhsString = lhs.string(), rhsString = rhs.string();
+    size_t i = 0, minSize = std::min(lhsString.size(), rhsString.size());
+    while (std::tolower(static_cast<unsigned char>(lhsString[i])) == std::tolower(static_cast<unsigned char>(rhsString[i])) && i < minSize) {
+        ++i;
+    }
+    return std::tolower(static_cast<unsigned char>(lhsString[i])) < std::tolower(static_cast<unsigned char>(rhsString[i]));
+}
 
 // Helper function for fnmatchSimple().
 bool fnmatchSimple_(char const* pattern, char const* str) {
@@ -438,7 +450,7 @@ void FileHandler::parseNextLineInFile() {
             fs::path valuePath = parseNextPath(index, line);
             //std::cout << "    Root: [" << keyPath << "] [" << valuePath << "]\n";
             
-            rootPaths_.insert({keyPath, valuePath});
+            rootPaths_.emplace(keyPath, valuePath);
         } else if (command == "in") {    // Syntax: in <write path> [add <read path>]
             if (index >= line.length()) {
                 throw std::runtime_error("Missing write path parameter.");
@@ -479,7 +491,7 @@ void FileHandler::parseNextLineInFile() {
             
             //std::cout << "    Ignore: [" << ignorePath << "]\n";
             
-            ignorePaths_.insert(ignorePath);
+            ignorePaths_.emplace(ignorePath);
         } else if (command == "include") {    // Syntax: include <path>
             if (index >= line.length()) {
                 throw std::runtime_error("Missing include path parameter.");

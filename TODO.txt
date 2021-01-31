@@ -1,5 +1,6 @@
 Fixes:
     * globPortable() should respect already matched paths in previousReadPaths_ and ignore paths in ignorePaths_.
+    * Use CompareFilename() in more places than just the tree output.
 
 Additions:
     * Add option to include hidden files with ? and *.

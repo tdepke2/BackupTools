@@ -41,8 +41,12 @@ class Application {
     void startBackup(const fs::path& configFilename, bool forceBackup);
     void restoreFromBackup(const fs::path& configFilename);
     
+    void printTree(const fs::path& searchPath);
+    
     private:
     FileHandler fileHandler_;
+    
+    void printTree2(const fs::path& searchPath, int recursionLevel);
 };
 
 #endif

@@ -24,6 +24,24 @@ void showHelp() {
 int main(int argc, char** argv) {
     Application app;
     
+    app.printTree("C:\\Users\\Thomas Depke\\Documents\\Docs\\Python Programs");
+    /*std::vector<fs::path> x = {
+        "This is a test",
+        "this is a test",
+        "Cats",
+        "cats",
+        "this thing"
+    };
+    std::sort(x.begin(), x.end());
+    std::cout << "default:\n";
+    std::for_each(x.begin(), x.end(), [](const fs::path& s){ std::cout << s << "\n"; });
+    std::cout << "\n";
+    
+    std::sort(x.begin(), x.end(), CompareFilename());
+    std::cout << "comp:\n";
+    std::for_each(x.begin(), x.end(), [](const fs::path& s){ std::cout << s << "\n"; });
+    std::cout << "\n";*/
+    
     showHelp();
     std::string line;
     while (true) {
@@ -53,7 +71,12 @@ int main(int argc, char** argv) {
                 
                 app.checkBackup(configFilename);
             } else if (command == "tree") {
+                if (index >= line.length()) {
+                    throw std::runtime_error("Missing path to config file.");
+                }
+                fs::path configFilename = FileHandler::parseNextPath(index, line);
                 
+                app.printPaths(configFilename);
             } else if (command == "restore") {
                 
             } else if (command == "help") {
