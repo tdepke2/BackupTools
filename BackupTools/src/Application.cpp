@@ -163,26 +163,44 @@ void Application::restoreFromBackup(const fs::path& configFilename) {
 }
 
 void Application::printTree(const fs::path& searchPath) {
-    if (!fs::exists(searchPath)) {
+    fs::file_status searchPathStatus = fs::status(searchPath);
+    if (!fs::exists(searchPathStatus)) {
         throw std::runtime_error("\"" + searchPath.string() + "\": Unable to find path.");
+    } else if (fs::is_directory(searchPathStatus)) {
+        std::cout << CSI::Cyan << searchPath.string() << CSI::Reset << "\n";
+        unsigned int numDirectories = 0, numFiles = 0;
+        printTree2(searchPath, "", &numDirectories, &numFiles);
+        
+        std::cout << "\n" << numDirectories << " directories, " << numFiles << " files\n";
+    } else {
+        throw std::runtime_error("\"" + searchPath.string() + "\": No sub-directories found.");
     }
-    std::cout << searchPath.string() << "\n";
-    printTree2(searchPath, 0);
 }
 
-void Application::printTree2(const fs::path& searchPath, int recursionLevel) {
+void Application::printTree2(const fs::path& searchPath, const std::string& prefix, unsigned int* numDirectories, unsigned int* numFiles) {
     std::vector<fs::directory_entry> searchContents;
     for (const auto& entry : fs::directory_iterator(searchPath)) {
         searchContents.emplace_back(entry);
     }
     std::sort(searchContents.begin(), searchContents.end(), CompareFilename());
-    for (const auto& entry : searchContents) {
-        for (int i = 0; i < recursionLevel; ++i) {
-            std::cout << "|   ";
-        }
-        std::cout << "|---" << entry.path().filename().string() << "\n";
-        if (entry.is_directory()) {
-            printTree2(entry.path(), recursionLevel + 1);
+    for (size_t i = 0; i < searchContents.size(); ++i) {
+        std::cout << prefix;
+        if (searchContents[i].is_directory()) {
+            ++(*numDirectories);
+            if (i + 1 != searchContents.size()) {
+                std::cout << "|-- " << CSI::Cyan << searchContents[i].path().filename().string() << CSI::Reset << "\n";
+                printTree2(searchContents[i].path(), prefix + "|   ", numDirectories, numFiles);
+            } else {
+                std::cout << "\'-- " << CSI::Cyan << searchContents[i].path().filename().string() << CSI::Reset << "\n";
+                printTree2(searchContents[i].path(), prefix + "    ", numDirectories, numFiles);
+            }
+        } else {
+            ++(*numFiles);
+            if (i + 1 != searchContents.size()) {
+                std::cout << "|-- " << searchContents[i].path().filename().string() << "\n";
+            } else {
+                std::cout << "\'-- " << searchContents[i].path().filename().string() << "\n";
+            }
         }
     }
 }

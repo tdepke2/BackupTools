@@ -46,7 +46,7 @@ class Application {
     private:
     FileHandler fileHandler_;
     
-    void printTree2(const fs::path& searchPath, int recursionLevel);
+    void printTree2(const fs::path& searchPath, const std::string& prefix, unsigned int* numDirectories, unsigned int* numFiles);
 };
 
 #endif
