@@ -24,7 +24,7 @@ void showHelp() {
 int main(int argc, char** argv) {
     Application app;
     
-    app.printTree("C:\\Users\\Thomas Depke\\Documents\\Docs\\Python Programs");
+    //app.printTree("C:\\Users\\Thomas Depke\\Documents\\Docs\\Python Programs");
     /*std::vector<fs::path> x = {
         "This is a test",
         "this is a test",

@@ -34,8 +34,8 @@ void Application::printPaths(const fs::path& configFilename) {
     longestParentPath = nextPath.readAbsolute.parent_path().string();
     rootPaths.emplace(nextPath.readAbsolute.root_path());
     while (!nextPath.isEmpty()) {
-        if (!readPathsMapping.emplace(nextPath.readAbsolute, nextPath.writePath).second) {
-            std::cout << "Warn: Skipping duplicate read path " << nextPath.readAbsolute << ".\n";
+        if (!readPathsMapping.emplace(nextPath.readAbsolute, nextPath.writePath / nextPath.readLocal).second) {
+            std::cout << CSI::Yellow << "Warn: Skipping duplicate read path: " << nextPath.readAbsolute.string() << CSI::Reset << "\n";
         }
         if (longestParentPath != nextPath.readAbsolute.parent_path().string().substr(0, longestParentPath.size())) {    // Update longestParentPath.
             std::string currentParentPath = nextPath.readAbsolute.parent_path().string();
@@ -53,11 +53,7 @@ void Application::printPaths(const fs::path& configFilename) {
         nextPath = fileHandler_.getNextWriteReadPath();
     }
     
-    
-    std::cout << "longestParentPath = " << longestParentPath << "\n";
-    for (const auto& keyVal : readPathsMapping) {
-        std::cout << keyVal.first << " ->\n    " << keyVal.second << "\n";
-    }
+    printTree(longestParentPath, readPathsMapping);
 }
 
 std::pair<bool, std::vector<fs::path>> Application::checkBackup(const fs::path& configFilename, bool displayConfirmation) {
@@ -162,14 +158,14 @@ void Application::restoreFromBackup(const fs::path& configFilename) {
     
 }
 
-void Application::printTree(const fs::path& searchPath) {
+void Application::printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping) {
     fs::file_status searchPathStatus = fs::status(searchPath);
     if (!fs::exists(searchPathStatus)) {
         throw std::runtime_error("\"" + searchPath.string() + "\": Unable to find path.");
     } else if (fs::is_directory(searchPathStatus)) {
         std::cout << CSI::Cyan << searchPath.string() << CSI::Reset << "\n";
         unsigned int numDirectories = 0, numFiles = 0;
-        printTree2(searchPath, "", &numDirectories, &numFiles);
+        printTree2(searchPath, readPathsMapping, "", &numDirectories, &numFiles);
         
         std::cout << "\n" << numDirectories << " directories, " << numFiles << " files\n";
     } else {
@@ -177,10 +173,15 @@ void Application::printTree(const fs::path& searchPath) {
     }
 }
 
-void Application::printTree2(const fs::path& searchPath, const std::string& prefix, unsigned int* numDirectories, unsigned int* numFiles) {
+void Application::printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const std::string& prefix, unsigned int* numDirectories, unsigned int* numFiles) {
     std::vector<fs::directory_entry> searchContents;
-    for (const auto& entry : fs::directory_iterator(searchPath)) {
-        searchContents.emplace_back(entry);
+    try {
+        for (const auto& entry : fs::directory_iterator(searchPath)) {
+            searchContents.emplace_back(entry);
+        }
+    } catch (std::exception& ex) {
+        std::cout << prefix << CSI::Red << "Error: " << ex.what() << CSI::Reset << "\n";
+        return;
     }
     std::sort(searchContents.begin(), searchContents.end(), CompareFilename());
     for (size_t i = 0; i < searchContents.size(); ++i) {
@@ -189,17 +190,19 @@ void Application::printTree2(const fs::path& searchPath, const std::string& pref
             ++(*numDirectories);
             if (i + 1 != searchContents.size()) {
                 std::cout << "|-- " << CSI::Cyan << searchContents[i].path().filename().string() << CSI::Reset << "\n";
-                printTree2(searchContents[i].path(), prefix + "|   ", numDirectories, numFiles);
+                printTree2(searchContents[i].path(), readPathsMapping, prefix + "|   ", numDirectories, numFiles);
             } else {
                 std::cout << "\'-- " << CSI::Cyan << searchContents[i].path().filename().string() << CSI::Reset << "\n";
-                printTree2(searchContents[i].path(), prefix + "    ", numDirectories, numFiles);
+                printTree2(searchContents[i].path(), readPathsMapping, prefix + "    ", numDirectories, numFiles);
             }
         } else {
             ++(*numFiles);
-            if (i + 1 != searchContents.size()) {
-                std::cout << "|-- " << searchContents[i].path().filename().string() << "\n";
+            auto findResult = readPathsMapping.find(searchContents[i].path());
+            if (findResult != readPathsMapping.end()) {
+                std::cout << (i + 1 != searchContents.size() ? "|-- " : "\'-- ") << CSI::Green << searchContents[i].path().filename().string() << CSI::Reset << "\n";
+                std::cout << prefix << (i + 1 != searchContents.size() ? "|   " : "    ") << " -> " << findResult->second.string() << "\n";
             } else {
-                std::cout << "\'-- " << searchContents[i].path().filename().string() << "\n";
+                std::cout << (i + 1 != searchContents.size() ? "|-- " : "\'-- ") << CSI::Yellow << searchContents[i].path().filename().string() << CSI::Reset << "\n";
             }
         }
     }

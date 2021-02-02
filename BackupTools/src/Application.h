@@ -41,12 +41,11 @@ class Application {
     void startBackup(const fs::path& configFilename, bool forceBackup);
     void restoreFromBackup(const fs::path& configFilename);
     
-    void printTree(const fs::path& searchPath);
-    
     private:
     FileHandler fileHandler_;
     
-    void printTree2(const fs::path& searchPath, const std::string& prefix, unsigned int* numDirectories, unsigned int* numFiles);
+    void printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping);
+    void printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const std::string& prefix, unsigned int* numDirectories, unsigned int* numFiles);
 };
 
 #endif
