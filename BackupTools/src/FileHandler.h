@@ -29,7 +29,7 @@ class FileHandler {
     static bool fnmatchPortable(char const* pattern, char const* str);    // Implementation of the unix fnmatch(3) function. More details in .cpp file.
     static bool containsWildcard(char const* pattern);    // Determines if a string contains glob wildcards.
     static std::vector<std::pair<fs::path, fs::path>> globPortable(fs::path pattern);    // Returns a list of absolute/local paths that match the pattern. The pattern must be in normal form.
-    static bool checkFileEquivalence(const fs::path& source, const fs::path& dest);    // Returns true if files are identical, false otherwise.
+    static bool checkFileEquivalence(const fs::path& source, const fs::path& dest);    // Returns true if files are identical, false otherwise. Works with directories as well.
     static void skipWhitespace(std::string::size_type& index, const std::string& str);    // Increment index while space character found in str.
     static std::string parseNextWord(std::string::size_type& index, const std::string& str);    // Return next string in str until space found.
     static fs::path parseNextPath(std::string::size_type& index, const std::string& str);    // Return next path (considers paths wrapped in double quotes) and normalize it.

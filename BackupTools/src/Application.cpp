@@ -53,6 +53,7 @@ void Application::printPaths(const fs::path& configFilename) {
         nextPath = fileHandler_.getNextWriteReadPath();
     }
     
+    // Need to modify longestParentPath so that it is a std::map<fs::path, fs::path> for longestParentPath per root directory, and remove rootPaths. ########################################################################
     printTree(longestParentPath, readPathsMapping);
 }
 
@@ -147,9 +148,14 @@ void Application::startBackup(const fs::path& configFilename, bool forceBackup) 
     
     fileHandler_.loadConfigFile(configFilename);
     for (WriteReadPath nextPath = fileHandler_.getNextWriteReadPath(); !nextPath.isEmpty(); nextPath = fileHandler_.getNextWriteReadPath()) {
-        if (!FileHandler::checkFileEquivalence(nextPath.readAbsolute, nextPath.writePath / nextPath.readLocal)) {
-            std::cout << "Replacing " << nextPath.writePath / nextPath.readLocal << ".\n";
-            fs::copy(nextPath.readAbsolute, nextPath.writePath / nextPath.readLocal, fs::copy_options::overwrite_existing);
+        fs::path destinationPath = nextPath.writePath / nextPath.readLocal;
+        if (!FileHandler::checkFileEquivalence(nextPath.readAbsolute, destinationPath)) {
+            std::cout << "Replacing " << destinationPath << ".\n";
+            if (fs::is_directory(nextPath.readAbsolute)) {
+                fs::create_directory(destinationPath);
+            } else {
+                fs::copy(nextPath.readAbsolute, destinationPath, fs::copy_options::overwrite_existing);
+            }
         }
     }
 }
@@ -181,6 +187,13 @@ void Application::printTree2(const fs::path& searchPath, const std::map<fs::path
         }
     } catch (std::exception& ex) {
         std::cout << prefix << CSI::Red << "Error: " << ex.what() << CSI::Reset << "\n";
+        return;
+    }
+    if (searchContents.empty()) {
+        auto findResult = readPathsMapping.find(searchPath);
+        if (findResult != readPathsMapping.end()) {
+            std::cout << prefix << " -> " << findResult->second.string() << "\n";
+        }
         return;
     }
     std::sort(searchContents.begin(), searchContents.end(), CompareFilename());

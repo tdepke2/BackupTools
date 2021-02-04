@@ -255,11 +255,11 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
         fs::path::iterator nextPatternIter = std::next(currentPatternIter);
         
         bool matchAllPaths = false;
-        bool matchFiles = true;
+        bool addToResult = true;
         if (*currentPatternIter == fs::path("**")) {    // If this sub-pattern is a globstar, match current path with the next sub-pattern and all contained directories with the current sub-pattern.
             matchAllPaths = true;
             if (nextPatternIter != pattern.end()) {
-                matchFiles = false;
+                addToResult = false;
             }
             
             pathStack.push(pathTraversal);
@@ -270,13 +270,14 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
         for (const auto& entry : fs::directory_iterator(pathTraversal)) {
             if (matchAllPaths || fnmatchSimple(currentPatternIter->string().c_str(), entry.path().filename().string().c_str())) {
                 //std::cout << "Matched " << entry.path() << "\n";
+                if (addToResult) {
+                    fs::path nextPathTraversal = pathTraversal / entry.path().filename();
+                    result.emplace_back(nextPathTraversal, nextPathTraversal.string().substr(dirPrefixOffset));
+                }
                 if (entry.is_directory()) {
                     pathStack.push(pathTraversal / entry.path().filename());
                     iterStack.push(nextPatternIter);
                     //std::cout << "    " << pathStack.top() << "\n";
-                } else if (matchFiles && entry.is_regular_file()) {
-                    fs::path nextPathTraversal = pathTraversal / entry.path().filename();
-                    result.emplace_back(nextPathTraversal, nextPathTraversal.string().substr(dirPrefixOffset));
                 }
             }
         }
@@ -291,7 +292,11 @@ bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& d
     std::ifstream sourceFile(source, std::ios::ate | std::ios::binary);    // Open files in binary mode and seek to end.
     std::ifstream destFile(dest, std::ios::ate | std::ios::binary);
     if (!sourceFile.is_open() || !destFile.is_open()) {
-        return false;
+        if (fs::is_directory(source) && fs::is_directory(dest) && source.filename() == dest.filename()) {
+            return true;
+        } else {
+            return false;
+        }
     }
     const std::ios::pos_type sourceSize = sourceFile.tellg();    // Find file sizes.
     const std::ios::pos_type destSize = destFile.tellg();

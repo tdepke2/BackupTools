@@ -24,24 +24,6 @@ void showHelp() {
 int main(int argc, char** argv) {
     Application app;
     
-    //app.printTree("C:\\Users\\Thomas Depke\\Documents\\Docs\\Python Programs");
-    /*std::vector<fs::path> x = {
-        "This is a test",
-        "this is a test",
-        "Cats",
-        "cats",
-        "this thing"
-    };
-    std::sort(x.begin(), x.end());
-    std::cout << "default:\n";
-    std::for_each(x.begin(), x.end(), [](const fs::path& s){ std::cout << s << "\n"; });
-    std::cout << "\n";
-    
-    std::sort(x.begin(), x.end(), CompareFilename());
-    std::cout << "comp:\n";
-    std::for_each(x.begin(), x.end(), [](const fs::path& s){ std::cout << s << "\n"; });
-    std::cout << "\n";*/
-    
     showHelp();
     std::string line;
     while (true) {
@@ -94,11 +76,6 @@ int main(int argc, char** argv) {
             std::cout << CSI::Red << "Error: " << ex.what() << CSI::Reset << "\n";
         }
     }
-    
-    /*app.printPaths("sample.txt");
-    std::cout << "\n";
-    app.startBackup("sample.txt", false);
-    std::cout << "\n";*/
     
     return 0;
 }

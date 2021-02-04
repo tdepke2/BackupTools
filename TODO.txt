@@ -1,4 +1,5 @@
 Fixes:
+    * Detect renames in startBackup() so that unnecessary copies/deletes are not performed.
     * globPortable() should respect already matched paths in previousReadPaths_ and ignore paths in ignorePaths_.
     * Use CompareFilename() in more places than just the tree output.
 
