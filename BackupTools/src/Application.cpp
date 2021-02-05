@@ -1,5 +1,6 @@
 #include "Application.h"
 #include <algorithm>
+#include <cassert>
 #include <cctype>
 #include <iostream>
 #include <map>
@@ -7,6 +8,10 @@
 
 std::ostream& operator<<(std::ostream& out, CSI csiCode) {
     return out << '\033' << '[' << static_cast<int>(csiCode) << 'm';
+}
+
+bool compareFileChange(const std::pair<fs::path, fs::path>& lhs, const std::pair<fs::path, fs::path>& rhs) {
+    return compareFilename(lhs.second, rhs.second);
 }
 
 bool Application::checkUserConfirmation() {
@@ -31,6 +36,10 @@ void Application::printPaths(const fs::path& configFilename) {
     fileHandler_.loadConfigFile(configFilename);
     
     WriteReadPath nextPath = fileHandler_.getNextWriteReadPath();
+    if (nextPath.isEmpty()) {
+        std::cout << "No files or directories found to track.\n";
+        return;
+    }
     longestParentPath = nextPath.readAbsolute.parent_path().string();
     rootPaths.emplace(nextPath.readAbsolute.root_path());
     while (!nextPath.isEmpty()) {
@@ -57,8 +66,8 @@ void Application::printPaths(const fs::path& configFilename) {
     printTree(longestParentPath, readPathsMapping);
 }
 
-std::pair<bool, std::vector<fs::path>> Application::checkBackup(const fs::path& configFilename, bool displayConfirmation) {
-    std::vector<fs::path> pathDeletions, pathAdditions, pathModifications;
+Application::FileChanges Application::checkBackup(const fs::path& configFilename, bool displayConfirmation) {
+    FileChanges changes;
     std::map<fs::path, std::set<fs::path>> writePathsChecklist;
     auto lastWritePathIter = writePathsChecklist.end();
     fileHandler_.loadConfigFile(configFilename);
@@ -77,60 +86,60 @@ std::pair<bool, std::vector<fs::path>> Application::checkBackup(const fs::path& 
         
         fs::path destinationPath = nextPath.writePath / nextPath.readLocal;
         if (lastWritePathIter->second.erase(destinationPath) == 0) {
-            pathAdditions.push_back(destinationPath);
+            auto emplaceResult = changes.additions.emplace(nextPath.readAbsolute, destinationPath);
+            assert(emplaceResult.second);
         } else if (!FileHandler::checkFileEquivalence(nextPath.readAbsolute, destinationPath)) {
-            pathModifications.push_back(destinationPath);
+            auto emplaceResult = changes.modifications.emplace(nextPath.readAbsolute, destinationPath);
+            assert(emplaceResult.second);
         }
     }
     
     for (const auto& writePath : writePathsChecklist) {
         for (const auto& p : writePath.second) {
-            pathDeletions.push_back(p);
+            auto emplaceResult = changes.deletions.emplace(p);
+            assert(emplaceResult.second);
         }
     }
     
-    if (pathDeletions.empty() && pathAdditions.empty() && pathModifications.empty()) {
+    if (changes.isEmpty()) {
         std::cout << "All up to date.\n";
-        return {false, pathDeletions};
+        return changes;
     }
     
-    if (!pathDeletions.empty()) {
-        std::sort(pathDeletions.begin(), pathDeletions.end());
+    if (!changes.deletions.empty()) {
         std::cout << "Deletions:\n" << CSI::Red;
-        for (const auto& p : pathDeletions) {
-            std::cout << "  " << p << "\n";
+        for (const auto& p : changes.deletions) {
+            std::cout << "-   " << p.string() << "\n";
         }
         std::cout << CSI::Reset << "\n";
     }
     
-    if (!pathAdditions.empty()) {
-        std::sort(pathAdditions.begin(), pathAdditions.end());
+    if (!changes.additions.empty()) {
         std::cout << "Additions:\n" << CSI::Green;
-        for (const auto& p : pathAdditions) {
-            std::cout << "  " << p << "\n";
+        for (const auto& p : changes.additions) {
+            std::cout << "+   " << p.second.string() << "\n";
         }
         std::cout << CSI::Reset << "\n";
     }
     
-    if (!pathModifications.empty()) {
-        std::sort(pathModifications.begin(), pathModifications.end());
-        std::cout << "\nModifications:\n" << CSI::Yellow;
-        for (const auto& p : pathModifications) {
-            std::cout << "  " << p << "\n";
+    if (!changes.modifications.empty()) {
+        std::cout << "Modifications:\n" << CSI::Yellow;
+        for (const auto& p : changes.modifications) {
+            std::cout << "*   " << p.second.string() << "\n";
         }
         std::cout << CSI::Reset << "\n";
     }
     
     if (displayConfirmation) {
-        std::cout << "After this operation, " << pathDeletions.size() << " item(s) will be removed, " << pathAdditions.size() << " item(s) will be added, and " << pathModifications.size() << " item(s) will be modified.\n";
+        std::cout << "After this operation, " << changes.deletions.size() << " item(s) will be removed, " << changes.additions.size() << " item(s) will be added, and " << changes.modifications.size() << " item(s) will be modified.\n";
         std::cout << "Are you sure? [Y/N] ";
     }
-    return {true, pathDeletions};
+    return changes;
 }
 
 void Application::startBackup(const fs::path& configFilename, bool forceBackup) {
-    auto checkBackupResult = checkBackup(configFilename, !forceBackup);
-    if (!checkBackupResult.first) {
+    FileChanges changes = checkBackup(configFilename, !forceBackup);
+    if (changes.isEmpty()) {
         return;
     }
     if (!forceBackup) {
@@ -140,23 +149,23 @@ void Application::startBackup(const fs::path& configFilename, bool forceBackup) 
         }
     }
     
-    for (size_t i = checkBackupResult.second.size(); i > 0;) {
-        --i;
-        std::cout << "Removing " << checkBackupResult.second[i] << "\n";
-        fs::remove(checkBackupResult.second[i]);
+    for (auto setIter = changes.deletions.rbegin(); setIter != changes.deletions.rend(); ++setIter) {    // Iterate through deletions in reverse to avoid using recursive delete function.
+        std::cout << "Removing " << setIter->string() << "\n";
+        fs::remove(*setIter);
     }
     
-    fileHandler_.loadConfigFile(configFilename);
-    for (WriteReadPath nextPath = fileHandler_.getNextWriteReadPath(); !nextPath.isEmpty(); nextPath = fileHandler_.getNextWriteReadPath()) {
-        fs::path destinationPath = nextPath.writePath / nextPath.readLocal;
-        if (!FileHandler::checkFileEquivalence(nextPath.readAbsolute, destinationPath)) {
-            std::cout << "Replacing " << destinationPath << ".\n";
-            if (fs::is_directory(nextPath.readAbsolute)) {
-                fs::create_directory(destinationPath);
-            } else {
-                fs::copy(nextPath.readAbsolute, destinationPath, fs::copy_options::overwrite_existing);
-            }
+    for (const auto& p : changes.additions) {
+        std::cout << "Adding " << p.second.string() << "\n";
+        if (fs::is_directory(p.first)) {
+            fs::create_directory(p.second);
+        } else {
+            fs::copy(p.first, p.second);
         }
+    }
+    
+    for (const auto& p : changes.modifications) {
+        std::cout << "Replacing " << p.second.string() << "\n";
+        fs::copy(p.first, p.second, fs::copy_options::overwrite_existing);
     }
 }
 
@@ -196,7 +205,7 @@ void Application::printTree2(const fs::path& searchPath, const std::map<fs::path
         }
         return;
     }
-    std::sort(searchContents.begin(), searchContents.end(), CompareFilename());
+    std::sort(searchContents.begin(), searchContents.end(), compareFilename);
     for (size_t i = 0; i < searchContents.size(); ++i) {
         std::cout << prefix;
         if (searchContents[i].is_directory()) {

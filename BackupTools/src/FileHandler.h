@@ -10,10 +10,6 @@
 
 namespace fs = std::filesystem;
 
-struct CompareFilename {
-    bool operator()(const fs::path& lhs, const fs::path& rhs);
-};
-
 struct WriteReadPath {
     fs::path writePath;
     fs::path readAbsolute;
@@ -21,6 +17,8 @@ struct WriteReadPath {
     
     bool isEmpty() const { return readAbsolute.empty(); }
 };
+
+bool compareFilename(const fs::path& lhs, const fs::path& rhs);    // Comparator to sort filenames (case is ignored).
 
 class FileHandler {
     public:

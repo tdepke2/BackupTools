@@ -33,11 +33,22 @@ enum CSI : int {    // Control Sequence Introducer used to set colors and format
 };
 std::ostream& operator<<(std::ostream& out, CSI csiCode);
 
+bool compareFileChange(const std::pair<fs::path, fs::path>& lhs, const std::pair<fs::path, fs::path>& rhs);
+
 class Application {
     public:
+    struct FileChanges {
+        std::set<fs::path, decltype(&compareFilename)> deletions;
+        std::set<std::pair<fs::path, fs::path>, decltype(&compareFileChange)> additions;
+        std::set<std::pair<fs::path, fs::path>, decltype(&compareFileChange)> modifications;
+        
+        FileChanges() : deletions(&compareFilename), additions(&compareFileChange), modifications(&compareFileChange) {}
+        bool isEmpty() const { return deletions.empty() && additions.empty() && modifications.empty(); }
+    };
+    
     static bool checkUserConfirmation();    // Gets user input and returns true only if any variant of "yes" was entered.
     void printPaths(const fs::path& configFilename);
-    std::pair<bool, std::vector<fs::path>> checkBackup(const fs::path& configFilename, bool displayConfirmation = false);
+    FileChanges checkBackup(const fs::path& configFilename, bool displayConfirmation = false);
     void startBackup(const fs::path& configFilename, bool forceBackup);
     void restoreFromBackup(const fs::path& configFilename);
     
