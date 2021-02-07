@@ -41,9 +41,10 @@ class Application {
         std::set<fs::path, decltype(&compareFilename)> deletions;
         std::set<std::pair<fs::path, fs::path>, decltype(&compareFileChange)> additions;
         std::set<std::pair<fs::path, fs::path>, decltype(&compareFileChange)> modifications;
+        std::set<std::pair<fs::path, fs::path>, decltype(&compareFileChange)> renames;
         
-        FileChanges() : deletions(&compareFilename), additions(&compareFileChange), modifications(&compareFileChange) {}
-        bool isEmpty() const { return deletions.empty() && additions.empty() && modifications.empty(); }
+        FileChanges() : deletions(&compareFilename), additions(&compareFileChange), modifications(&compareFileChange), renames(&compareFileChange) {}
+        bool isEmpty() const { return deletions.empty() && additions.empty() && modifications.empty() && renames.empty(); }
     };
     
     static bool checkUserConfirmation();    // Gets user input and returns true only if any variant of "yes" was entered.
@@ -55,8 +56,9 @@ class Application {
     private:
     FileHandler fileHandler_;
     
-    void printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping);
-    void printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const std::string& prefix, unsigned int* numDirectories, unsigned int* numFiles);
+    static void printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping);
+    static void printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const std::string& prefix, unsigned int* numDirectories, unsigned int* numFiles);
+    static void optimizeForRenames(FileChanges& changes);
 };
 
 #endif

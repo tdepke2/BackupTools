@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cctype>
+#include <iomanip>
 #include <iostream>
 #include <map>
 #include <set>
@@ -68,12 +69,12 @@ void Application::printPaths(const fs::path& configFilename) {
 
 Application::FileChanges Application::checkBackup(const fs::path& configFilename, bool displayConfirmation) {
     FileChanges changes;
-    std::map<fs::path, std::set<fs::path>> writePathsChecklist;
+    std::map<fs::path, std::set<fs::path>> writePathsChecklist;    // Maps a destination path to the current contents of that path.
     auto lastWritePathIter = writePathsChecklist.end();
     fileHandler_.loadConfigFile(configFilename);
     
     for (WriteReadPath nextPath = fileHandler_.getNextWriteReadPath(); !nextPath.isEmpty(); nextPath = fileHandler_.getNextWriteReadPath()) {
-        if (lastWritePathIter == writePathsChecklist.end() || lastWritePathIter->first != nextPath.writePath) {
+        if (lastWritePathIter == writePathsChecklist.end() || lastWritePathIter->first != nextPath.writePath) {    // Check if the write path changed and add directory contents if it is a new path.
             auto insertResult = writePathsChecklist.emplace(nextPath.writePath, std::set<fs::path>());
             if (insertResult.second) {
                 for (const auto& entry : fs::recursive_directory_iterator(nextPath.writePath)) {
@@ -85,26 +86,29 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
         }
         
         fs::path destinationPath = nextPath.writePath / nextPath.readLocal;
-        if (lastWritePathIter->second.erase(destinationPath) == 0) {
+        if (lastWritePathIter->second.erase(destinationPath) == 0) {    // Attempt to remove the destination path from the checklist. If it's not found, then it doesn't currently exist and needs to be added.
             auto emplaceResult = changes.additions.emplace(nextPath.readAbsolute, destinationPath);
             assert(emplaceResult.second);
-        } else if (!FileHandler::checkFileEquivalence(nextPath.readAbsolute, destinationPath)) {
+        } else if (!FileHandler::checkFileEquivalence(nextPath.readAbsolute, destinationPath)) {    // If file exists but contents differ, it needs to be updated.
             auto emplaceResult = changes.modifications.emplace(nextPath.readAbsolute, destinationPath);
             assert(emplaceResult.second);
         }
     }
     
-    for (const auto& writePath : writePathsChecklist) {
+    for (const auto& writePath : writePathsChecklist) {    // Any remaining paths in the checklist do not belong, mark these for deletion.
         for (const auto& p : writePath.second) {
             auto emplaceResult = changes.deletions.emplace(p);
             assert(emplaceResult.second);
         }
     }
+    writePathsChecklist.clear();
     
     if (changes.isEmpty()) {
         std::cout << "All up to date.\n";
         return changes;
     }
+    
+    optimizeForRenames(changes);
     
     if (!changes.deletions.empty()) {
         std::cout << "Deletions:\n" << CSI::Red;
@@ -130,9 +134,29 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
         std::cout << CSI::Reset << "\n";
     }
     
+    if (!changes.renames.empty()) {
+        std::cout << "Renames:\n" << CSI::Magenta;
+        for (const auto& p : changes.renames) {
+            std::cout << "~   " << p.first.string() << " -> " << p.second.string() << "\n";
+        }
+        std::cout << CSI::Reset << "\n";
+    }
+    
     if (displayConfirmation) {
-        std::cout << "After this operation, " << changes.deletions.size() << " item(s) will be removed, " << changes.additions.size() << " item(s) will be added, and " << changes.modifications.size() << " item(s) will be modified.\n";
-        std::cout << "Are you sure? [Y/N] ";
+        std::cout << "After this operation:\n";
+        if (!changes.deletions.empty()) {
+            std::cout << std::setw(5) << changes.deletions.size() << " item(s) will be removed.\n";
+        }
+        if (!changes.additions.empty()) {
+            std::cout << std::setw(5) << changes.additions.size() << " item(s) will be added.\n";
+        }
+        if (!changes.modifications.empty()) {
+            std::cout << std::setw(5) << changes.modifications.size() << " item(s) will be modified.\n";
+        }
+        if (!changes.renames.empty()) {
+            std::cout << std::setw(5) << changes.renames.size() << " item(s) will be renamed.\n";
+        }
+        std::cout << "\nAre you sure? [Y/N] ";
     }
     return changes;
 }
@@ -149,11 +173,6 @@ void Application::startBackup(const fs::path& configFilename, bool forceBackup) 
         }
     }
     
-    for (auto setIter = changes.deletions.rbegin(); setIter != changes.deletions.rend(); ++setIter) {    // Iterate through deletions in reverse to avoid using recursive delete function.
-        std::cout << "Removing " << setIter->string() << "\n";
-        fs::remove(*setIter);
-    }
-    
     for (const auto& p : changes.additions) {
         std::cout << "Adding " << p.second.string() << "\n";
         if (fs::is_directory(p.first)) {
@@ -161,6 +180,16 @@ void Application::startBackup(const fs::path& configFilename, bool forceBackup) 
         } else {
             fs::copy(p.first, p.second);
         }
+    }
+    
+    for (const auto& p : changes.renames) {    // Renaming must happen after additions and before removals so that there are no missing directory conflicts.
+        std::cout << "Renaming " << p.first.string() << "\n";
+        fs::rename(p.first, p.second);
+    }
+    
+    for (auto setIter = changes.deletions.rbegin(); setIter != changes.deletions.rend(); ++setIter) {    // Iterate through deletions in reverse to avoid using recursive delete function.
+        std::cout << "Removing " << setIter->string() << "\n";
+        fs::remove(*setIter);
     }
     
     for (const auto& p : changes.modifications) {
@@ -226,6 +255,37 @@ void Application::printTree2(const fs::path& searchPath, const std::map<fs::path
             } else {
                 std::cout << (i + 1 != searchContents.size() ? "|-- " : "\'-- ") << CSI::Yellow << searchContents[i].path().filename().string() << CSI::Reset << "\n";
             }
+        }
+    }
+}
+
+void Application::optimizeForRenames(FileChanges& changes) {
+    std::map<std::uintmax_t, std::set<fs::path>> deletionsFileSizes;    // Map file sizes to their paths for quick lookup of which files match the contents of a path.
+    for (const auto& p : changes.deletions) {
+        if (fs::is_regular_file(p)) {
+            deletionsFileSizes[fs::file_size(p)].emplace(p);
+        }
+    }
+    
+    for (auto additionsIter = changes.additions.begin(); additionsIter != changes.additions.end();) {
+        bool stepNextAddition = true;
+        if (fs::is_regular_file(additionsIter->first)) {
+            auto findResult = deletionsFileSizes.find(fs::file_size(additionsIter->first));
+            if (findResult != deletionsFileSizes.end()) {    // If file matches size of one of the deleted ones, check if contents match.
+                for (const fs::path& deletionPath : findResult->second) {
+                    if (FileHandler::checkFileEquivalence(additionsIter->first, deletionPath)) {
+                        changes.renames.emplace(deletionPath, additionsIter->second);    // Found a match, add it as a rename and remove the corresponding addition and delete (subdirectories are not touched because fs::rename() expects existing directories).
+                        changes.deletions.erase(changes.deletions.find(deletionPath));
+                        additionsIter = changes.additions.erase(additionsIter);
+                        stepNextAddition = false;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (stepNextAddition) {    // Prevent increment if changes.additions was modified.
+            ++additionsIter;
         }
     }
 }
