@@ -24,10 +24,10 @@ bool Application::checkUserConfirmation() {
             inputCleaned.push_back(std::tolower(static_cast<unsigned char>(c)));
         }
     }
-    if (inputCleaned == "y" || inputCleaned == "yee" || inputCleaned == "yes" || inputCleaned == "yeah") {
-        return true;
-    }
-    return false;
+    std::set<std::string> acceptInputs = {
+        "y", "ya", "ye", "yas", "yea", "yee", "yep", "yes", "yeah", "yessir", "affirmative", "true", "sure"
+    };
+    return acceptInputs.count(inputCleaned) > 0;
 }
 
 void Application::printPaths(const fs::path& configFilename) {

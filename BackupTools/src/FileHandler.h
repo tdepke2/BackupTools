@@ -23,6 +23,7 @@ bool compareFilename(const fs::path& lhs, const fs::path& rhs);    // Comparator
 class FileHandler {
     public:
     static char pathSeparator;
+    static bool globMatchesHiddenFiles;
     
     static bool fnmatchPortable(char const* pattern, char const* str);    // Implementation of the unix fnmatch(3) function. More details in .cpp file.
     static bool containsWildcard(char const* pattern);    // Determines if a string contains glob wildcards.

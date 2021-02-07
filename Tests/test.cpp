@@ -7,6 +7,8 @@
 // ****************************************************************************
 
 TEST(TestGlobbing, NoWildcards) {
+    FileHandler::globMatchesHiddenFiles = false;
+    
     EXPECT_EQ(FileHandler::fnmatchPortable("", ""), true);
     EXPECT_EQ(FileHandler::fnmatchPortable("a", "a"), true);
     EXPECT_EQ(FileHandler::fnmatchPortable("a", "b"), false);
@@ -27,6 +29,8 @@ TEST(TestGlobbing, NoWildcards) {
 }
 
 TEST(TestGlobbing, CommonCaseTests) {
+    FileHandler::globMatchesHiddenFiles = false;
+    
     EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\file.txt", "C:\\path\\to\\file.txt"), true);
     EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\file.txt", "D:\\path\\to\\file.txt"), false);
     EXPECT_EQ(FileHandler::fnmatchPortable("C:\\really\\long\\path\\to\\a\\different kind of\\file.txt", "C:\\really\\long\\path\\to\\a\\different kind of\\file.txt"), true);
@@ -65,6 +69,8 @@ TEST(TestGlobbing, CommonCaseTests) {
 }
 
 TEST(TestGlobbing, QuestionMark) {
+    FileHandler::globMatchesHiddenFiles = false;
+    
     EXPECT_EQ(FileHandler::fnmatchPortable("?", ""), false);
     EXPECT_EQ(FileHandler::fnmatchPortable("", "?"), false);
     EXPECT_EQ(FileHandler::fnmatchPortable("?", "?"), true);
@@ -94,6 +100,8 @@ TEST(TestGlobbing, QuestionMark) {
 }
 
 TEST(TestGlobbing, Star) {
+    FileHandler::globMatchesHiddenFiles = false;
+    
     // Single star.
     EXPECT_EQ(FileHandler::fnmatchPortable("*", ""), true);
     EXPECT_EQ(FileHandler::fnmatchPortable("*", "*"), true);
@@ -179,6 +187,8 @@ TEST(TestGlobbing, Star) {
 }
 
 TEST(TestGlobbing, Brackets) {
+    FileHandler::globMatchesHiddenFiles = false;
+    
     // No ranges.
     EXPECT_EQ(FileHandler::fnmatchPortable("[", ""), false);
     EXPECT_EQ(FileHandler::fnmatchPortable("[", "x"), false);
@@ -459,6 +469,8 @@ TEST(TestGlobbing, Brackets) {
 }
 
 TEST(TestGlobbing, Comprehensive) {
+    FileHandler::globMatchesHiddenFiles = false;
+    
     EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\*.???", "a.aaa"), false);
     EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\*.???", "C:\\path\\file.txt"), false);
     EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\*.???", "C:\\path\\to\\file.txt"), true);
@@ -475,6 +487,26 @@ TEST(TestGlobbing, Comprehensive) {
     EXPECT_EQ(FileHandler::fnmatchPortable("*a*??????*a*?????????a???????????????", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), true);
     EXPECT_EQ(FileHandler::fnmatchPortable("*a*??????*a*?????????a???????????????", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabaaaaaaaaaaaaaaa"), false);
     EXPECT_EQ(FileHandler::fnmatchPortable("*a*??????*a*?????????a???????????????", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabaaaaaaaaaaaaaa"), true);
+}
+
+TEST(TestGlobbing, GlobMatchesHidden) {
+    FileHandler::globMatchesHiddenFiles = true;
+    
+    EXPECT_EQ(FileHandler::fnmatchPortable("?", "x"), true);
+    EXPECT_EQ(FileHandler::fnmatchPortable("?", "."), true);
+    EXPECT_EQ(FileHandler::fnmatchPortable("*", "Bunch OF random text."), true);
+    EXPECT_EQ(FileHandler::fnmatchPortable("*", ".Bunch OF random text."), true);
+    EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\*.???", "a.aaa"), false);
+    EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\*.???", "C:\\path\\file.txt"), false);
+    EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\*.???", "C:\\path\\to\\file.txt"), true);
+    EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\*.???", "C:\\path\\to\\file.cc"), false);
+    EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\*.???", "C:\\path\\to\\file.data"), false);
+    EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\*.???", "C:\\path\\to\\.hid"), true);
+    EXPECT_EQ(FileHandler::fnmatchPortable("?[!!-@]*g[a-zA-Z0-9]", "xa!jam!gh"), true);
+    EXPECT_EQ(FileHandler::fnmatchPortable("?[!!-@]*g[a-zA-Z0-9]", ".a!jam!gh"), true);
+    EXPECT_EQ(FileHandler::fnmatchPortable("?[!!-@]*g[a-zA-Z0-9]", "x?!jam!gh"), false);
+    EXPECT_EQ(FileHandler::fnmatchPortable("?[!!-@]*g[a-zA-Z0-9]", "xa!jam!h"), false);
+    EXPECT_EQ(FileHandler::fnmatchPortable("?[!!-@]*g[a-zA-Z0-9]", "xa!jam!g@"), false);
 }
 
 // ****************************************************************************

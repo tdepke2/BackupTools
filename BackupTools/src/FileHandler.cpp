@@ -8,6 +8,7 @@
 #include <stdexcept>
 
 char FileHandler::pathSeparator = std::filesystem::path::preferred_separator;
+bool FileHandler::globMatchesHiddenFiles = true;
 
 bool compareFilename(const fs::path& lhs, const fs::path& rhs) {
     // Alternative method for cases like "lowercase must be sorted before uppercase" is to use collation table. https://stackoverflow.com/questions/19509110/sorting-a-string-with-stdsort-so-that-capital-letters-come-after-lower-case
@@ -118,9 +119,13 @@ bool fnmatchSimple_(char const* pattern, char const* str) {
 }
 
 // Alternative fnmatch version for cases with either no path separators, or path separators only at the end of pattern and str. Called by fnmatchPortable().
-bool fnmatchSimple(char const* pattern, char const* str) {
+bool fnmatchSimple(char const* pattern, char const* str, bool matchAllPaths = false) {
+    if (matchAllPaths) {
+        return (FileHandler::globMatchesHiddenFiles || *str != '.');
+    }
+    
     // Star does not match a leading dot in a name (because it's not supposed to match hidden files or the . and .. directories). Question mark does not match a leading dot in a name.
-    if ((*pattern == '*' && *str == '.') || (*pattern == '?' && *str == '.')) {
+    if (!FileHandler::globMatchesHiddenFiles && ((*pattern == '*' && *str == '.') || (*pattern == '?' && *str == '.'))) {
         return false;
     }
     
@@ -268,7 +273,7 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
         }
         
         for (const auto& entry : fs::directory_iterator(pathTraversal)) {
-            if (matchAllPaths || fnmatchSimple(currentPatternIter->string().c_str(), entry.path().filename().string().c_str())) {
+            if (fnmatchSimple(currentPatternIter->string().c_str(), entry.path().filename().string().c_str(), matchAllPaths)) {
                 //std::cout << "Matched " << entry.path() << "\n";
                 if (addToResult) {
                     fs::path nextPathTraversal = pathTraversal / entry.path().filename();
@@ -381,16 +386,16 @@ WriteReadPath FileHandler::getNextWriteReadPath() {
         parseNextLineInFile();
     }
     
-    if (globPortableResults_.empty()) {
+    if (globPortableResults_.empty()) {    // If no more results left, grab some more.
         globPortableResults_ = globPortable(readPath_);
         globPortableResultsIndex_ = 0;
+        
+        if (globPortableResults_.empty()) {    // The readPath_ may not match anything.
+            return result;
+        }
     }
     
-    if (globPortableResults_.empty()) {
-        return result;
-    }
-    
-    result.writePath = writePath_;
+    result.writePath = writePath_;    // Get next result from globPortableResults_.
     result.readAbsolute = globPortableResults_[globPortableResultsIndex_].first;
     result.readLocal = globPortableResults_[globPortableResultsIndex_].second;
     ++globPortableResultsIndex_;
