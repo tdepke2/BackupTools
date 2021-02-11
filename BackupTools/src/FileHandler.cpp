@@ -8,7 +8,7 @@
 #include <stdexcept>
 
 char FileHandler::pathSeparator = std::filesystem::path::preferred_separator;
-bool FileHandler::globMatchesHiddenFiles = true;
+bool FileHandler::globMatchesHiddenFiles = false;
 
 bool compareFilename(const fs::path& lhs, const fs::path& rhs) {
     // Alternative method for cases like "lowercase must be sorted before uppercase" is to use collation table. https://stackoverflow.com/questions/19509110/sorting-a-string-with-stdsort-so-that-capital-letters-come-after-lower-case

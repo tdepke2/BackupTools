@@ -30,7 +30,7 @@ bool Application::checkUserConfirmation() {
     return acceptInputs.count(inputCleaned) > 0;
 }
 
-void Application::printPaths(const fs::path& configFilename) {
+void Application::printPaths(const fs::path& configFilename, const bool countOnly) {
     std::map<fs::path, fs::path> readPathsMapping;
     std::string longestParentPath;
     std::set<fs::path> rootPaths;
@@ -64,7 +64,7 @@ void Application::printPaths(const fs::path& configFilename) {
     }
     
     // Need to modify longestParentPath so that it is a std::map<fs::path, fs::path> for longestParentPath per root directory, and remove rootPaths. ########################################################################
-    printTree(longestParentPath, readPathsMapping);
+    printTree(longestParentPath, readPathsMapping, countOnly);
 }
 
 Application::FileChanges Application::checkBackup(const fs::path& configFilename, bool displayConfirmation) {
@@ -202,58 +202,70 @@ void Application::restoreFromBackup(const fs::path& configFilename) {
     
 }
 
-void Application::printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping) {
+void Application::printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool countOnly) {
     fs::file_status searchPathStatus = fs::status(searchPath);
     if (!fs::exists(searchPathStatus)) {
         throw std::runtime_error("\"" + searchPath.string() + "\": Unable to find path.");
     } else if (fs::is_directory(searchPathStatus)) {
         std::cout << CSI::Cyan << searchPath.string() << CSI::Reset << "\n";
-        unsigned int numDirectories = 0, numFiles = 0;
-        printTree2(searchPath, readPathsMapping, "", &numDirectories, &numFiles);
+        PrintTreeStats stats;
+        printTree2(searchPath, readPathsMapping, !countOnly, "", &stats);
         
-        std::cout << "\n" << numDirectories << " directories, " << numFiles << " files\n";
+        std::cout << "\n" << stats.numDirectories << " directories, " << stats.numFiles << " files\n";
+        std::cout << stats.numIgnoredDirectories << " ignored directories, " << stats.numIgnoredFiles << " ignored files\n";
     } else {
         throw std::runtime_error("\"" + searchPath.string() + "\": No sub-directories found.");
     }
 }
 
-void Application::printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const std::string& prefix, unsigned int* numDirectories, unsigned int* numFiles) {
+void Application::printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool printOutput, const std::string& prefix, PrintTreeStats* stats) {
     std::vector<fs::directory_entry> searchContents;
     try {
         for (const auto& entry : fs::directory_iterator(searchPath)) {
             searchContents.emplace_back(entry);
         }
     } catch (std::exception& ex) {
-        std::cout << prefix << CSI::Red << "Error: " << ex.what() << CSI::Reset << "\n";
+        if (printOutput) {
+            std::cout << prefix << CSI::Red << "Error: " << ex.what() << CSI::Reset << "\n";
+        }
         return;
     }
     if (searchContents.empty()) {
         auto findResult = readPathsMapping.find(searchPath);
-        if (findResult != readPathsMapping.end()) {
+        if (printOutput && findResult != readPathsMapping.end()) {
             std::cout << prefix << " -> " << findResult->second.string() << "\n";
         }
         return;
     }
     std::sort(searchContents.begin(), searchContents.end(), compareFilename);
     for (size_t i = 0; i < searchContents.size(); ++i) {
-        std::cout << prefix;
+        if (printOutput) {
+            std::cout << prefix;
+        }
+        auto findResult = readPathsMapping.find(searchContents[i].path());
+        const bool isTracked = (findResult != readPathsMapping.end());
+        const bool isLast = (i + 1 == searchContents.size());
+        
         if (searchContents[i].is_directory()) {
-            ++(*numDirectories);
-            if (i + 1 != searchContents.size()) {
-                std::cout << "|-- " << CSI::Cyan << searchContents[i].path().filename().string() << CSI::Reset << "\n";
-                printTree2(searchContents[i].path(), readPathsMapping, prefix + "|   ", numDirectories, numFiles);
-            } else {
-                std::cout << "\'-- " << CSI::Cyan << searchContents[i].path().filename().string() << CSI::Reset << "\n";
-                printTree2(searchContents[i].path(), readPathsMapping, prefix + "    ", numDirectories, numFiles);
+            ++stats->numDirectories;
+            if (printOutput) {
+                std::cout << (isLast ? "\'-- " : "|-- ") << (isTracked ? CSI::Cyan : CSI::Yellow) << searchContents[i].path().filename().string() << CSI::Reset << "\n";
             }
+            if (!isTracked) {
+                ++stats->numIgnoredDirectories;
+            }
+            printTree2(searchContents[i].path(), readPathsMapping, printOutput, prefix + (isLast ? "    " : "|   "), stats);
         } else {
-            ++(*numFiles);
-            auto findResult = readPathsMapping.find(searchContents[i].path());
-            if (findResult != readPathsMapping.end()) {
-                std::cout << (i + 1 != searchContents.size() ? "|-- " : "\'-- ") << CSI::Green << searchContents[i].path().filename().string() << CSI::Reset << "\n";
-                std::cout << prefix << (i + 1 != searchContents.size() ? "|   " : "    ") << " -> " << findResult->second.string() << "\n";
+            ++stats->numFiles;
+            if (printOutput) {
+                std::cout << (isLast ? "\'-- " : "|-- ") << (isTracked ? CSI::Green : CSI::Yellow) << searchContents[i].path().filename().string() << CSI::Reset << "\n";
+            }
+            if (isTracked) {
+                if (printOutput) {
+                    std::cout << prefix << (isLast ? "    " : "|   ") << " -> " << findResult->second.string() << "\n";
+                }
             } else {
-                std::cout << (i + 1 != searchContents.size() ? "|-- " : "\'-- ") << CSI::Yellow << searchContents[i].path().filename().string() << CSI::Reset << "\n";
+                ++stats->numIgnoredFiles;
             }
         }
     }

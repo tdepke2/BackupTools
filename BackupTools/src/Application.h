@@ -48,16 +48,25 @@ class Application {
     };
     
     static bool checkUserConfirmation();    // Gets user input and returns true only if any variant of "yes" was entered.
-    void printPaths(const fs::path& configFilename);
+    void printPaths(const fs::path& configFilename, const bool countOnly);
     FileChanges checkBackup(const fs::path& configFilename, bool displayConfirmation = false);
     void startBackup(const fs::path& configFilename, bool forceBackup);
     void restoreFromBackup(const fs::path& configFilename);
     
     private:
+    struct PrintTreeStats {
+        uintmax_t numDirectories;
+        uintmax_t numFiles;
+        uintmax_t numIgnoredDirectories;
+        uintmax_t numIgnoredFiles;
+        
+        PrintTreeStats() : numDirectories(0), numFiles(0), numIgnoredDirectories(0), numIgnoredFiles(0) {}
+    };
+    
     FileHandler fileHandler_;
     
-    static void printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping);
-    static void printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const std::string& prefix, unsigned int* numDirectories, unsigned int* numFiles);
+    static void printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool countOnly);
+    static void printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool printOutput, const std::string& prefix, PrintTreeStats* stats);
     static void optimizeForRenames(FileChanges& changes);
 };
 

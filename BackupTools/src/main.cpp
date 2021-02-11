@@ -13,12 +13,12 @@ namespace fs = std::filesystem;
 
 void showHelp() {
     std::cout << "Options:\n";
-    std::cout << "  backup <config file>     Starts a backup.\n";
-    std::cout << "  check <config file>      Checks backup status.\n";
-    std::cout << "  tree <config file>       Displays tree of tracked files.\n";
-    std::cout << "  restore <config file>    Restores a backup.\n";
-    std::cout << "  help                     Shows this menu.\n";
-    std::cout << "  exit                     Exits interactive shell.\n";
+    std::cout << "  backup <config file>            Starts a backup.\n";
+    std::cout << "  check <config file>             Checks backup status.\n";
+    std::cout << "  tree <config file> [--count]    Displays tree of tracked files. Use \"--count\" to only display the total count.\n";
+    std::cout << "  restore <config file>           Restores a backup.\n";
+    std::cout << "  help                            Shows this menu.\n";
+    std::cout << "  exit                            Exits interactive shell.\n";
 }
 
 int main(int argc, char** argv) {
@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
                     throw std::runtime_error("Missing path to config file.");
                 }
                 fs::path configFilename = FileHandler::parseNextPath(index, line);
+                FileHandler::skipWhitespace(index, line);
                 
                 app.startBackup(configFilename, false);
             } else if (command == "check") {
@@ -50,6 +51,7 @@ int main(int argc, char** argv) {
                     throw std::runtime_error("Missing path to config file.");
                 }
                 fs::path configFilename = FileHandler::parseNextPath(index, line);
+                FileHandler::skipWhitespace(index, line);
                 
                 app.checkBackup(configFilename);
             } else if (command == "tree") {
@@ -57,8 +59,20 @@ int main(int argc, char** argv) {
                     throw std::runtime_error("Missing path to config file.");
                 }
                 fs::path configFilename = FileHandler::parseNextPath(index, line);
+                FileHandler::skipWhitespace(index, line);
                 
-                app.printPaths(configFilename);
+                bool countOnly = false;
+                while (index < line.length()) {
+                    command = FileHandler::parseNextWord(index, line);
+                    FileHandler::skipWhitespace(index, line);
+                    if (command == "--count") {
+                        countOnly = true;
+                    } else {
+                        throw std::runtime_error("Invalid parameter \"" + command + "\".");
+                    }
+                }
+                
+                app.printPaths(configFilename, countOnly);
             } else if (command == "restore") {
                 
             } else if (command == "help") {
@@ -68,7 +82,6 @@ int main(int argc, char** argv) {
             } else {
                 throw std::runtime_error("Unknown command \"" + command + "\". Type \"help\" for command list.");
             }
-            FileHandler::skipWhitespace(index, line);
             if (index < line.length()) {
                 throw std::runtime_error("Invalid parameter(s) \"" + line.substr(index) + "\".");
             }
