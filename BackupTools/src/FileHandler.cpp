@@ -10,6 +10,10 @@
 char FileHandler::pathSeparator = std::filesystem::path::preferred_separator;
 bool FileHandler::globMatchesHiddenFiles = false;
 
+std::ostream& operator<<(std::ostream& out, CSI csiCode) {
+    return out << '\033' << '[' << static_cast<int>(csiCode) << 'm';
+}
+
 bool compareFilename(const fs::path& lhs, const fs::path& rhs) {
     // Alternative method for cases like "lowercase must be sorted before uppercase" is to use collation table. https://stackoverflow.com/questions/19509110/sorting-a-string-with-stdsort-so-that-capital-letters-come-after-lower-case
     const std::string lhsString = lhs.string(), rhsString = rhs.string();
@@ -272,19 +276,23 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
             nextPatternIter = currentPatternIter;
         }
         
-        for (const auto& entry : fs::directory_iterator(pathTraversal)) {
-            if (fnmatchSimple(currentPatternIter->string().c_str(), entry.path().filename().string().c_str(), matchAllPaths)) {
-                //std::cout << "Matched " << entry.path() << "\n";
-                if (addToResult) {
-                    fs::path nextPathTraversal = pathTraversal / entry.path().filename();
-                    result.emplace_back(nextPathTraversal, nextPathTraversal.string().substr(dirPrefixOffset));
-                }
-                if (entry.is_directory()) {
-                    pathStack.push(pathTraversal / entry.path().filename());
-                    iterStack.push(nextPatternIter);
-                    //std::cout << "    " << pathStack.top() << "\n";
+        try {
+            for (const auto& entry : fs::directory_iterator(pathTraversal)) {
+                if (fnmatchSimple(currentPatternIter->string().c_str(), entry.path().filename().string().c_str(), matchAllPaths)) {
+                    //std::cout << "Matched " << entry.path() << "\n";
+                    if (addToResult) {
+                        fs::path nextPathTraversal = pathTraversal / entry.path().filename();
+                        result.emplace_back(nextPathTraversal, nextPathTraversal.string().substr(dirPrefixOffset));
+                    }
+                    if (entry.is_directory()) {
+                        pathStack.push(pathTraversal / entry.path().filename());
+                        iterStack.push(nextPatternIter);
+                        //std::cout << "    " << pathStack.top() << "\n";
+                    }
                 }
             }
+        } catch (std::exception& ex) {    // Exception accessing path can be ignored (treat it like an empty directory).
+            std::cout << CSI::Red << "Error: " << ex.what() << CSI::Reset << "\n";
         }
         
         //std::cout << "========================================\n";
@@ -355,6 +363,17 @@ fs::path FileHandler::parseNextPath(std::string::size_type& index, const std::st
         }
     }
     return fs::path(str.substr(start)).lexically_normal();
+}
+
+int FileHandler::parseNextInt(std::string::size_type& index, const std::string& str) {
+    std::string::size_type start = index;
+    while (index < str.length()) {
+        if (str[index] == ' ') {
+            return stoi(str.substr(start, index - start));
+        }
+        ++index;
+    }
+    return stoi(str.substr(start));
 }
 
 void FileHandler::loadConfigFile(const fs::path& filename) {

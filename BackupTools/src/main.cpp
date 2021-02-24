@@ -13,9 +13,12 @@ namespace fs = std::filesystem;
 
 void showHelp() {
     std::cout << "Options:\n";
-    std::cout << "  backup <config file>            Starts a backup.\n";
-    std::cout << "  check <config file>             Checks backup status.\n";
-    std::cout << "  tree <config file> [--count]    Displays tree of tracked files. Use \"--count\" to only display the total count.\n";
+    std::cout << "  backup <config file> [--limit n]    Starts a backup.\n";
+    std::cout << "      --limit n                       Limits output to n lines (50 by default). Use -1 for no limit.\n";
+    std::cout << "  check <config file> [--limit n]     Checks backup status.\n";
+    std::cout << "      --limit n                       Limits output to n lines (50 by default). Use -1 for no limit.\n";
+    std::cout << "  tree <config file> [--count]    Displays tree of tracked files.\n";
+    std::cout << "      --count                     Only display the total count.\n";
     std::cout << "  restore <config file>           Restores a backup.\n";
     std::cout << "  help                            Shows this menu.\n";
     std::cout << "  exit                            Exits interactive shell.\n";
@@ -45,7 +48,31 @@ int main(int argc, char** argv) {
                 fs::path configFilename = FileHandler::parseNextPath(index, line);
                 FileHandler::skipWhitespace(index, line);
                 
-                app.startBackup(configFilename, false);
+                unsigned int outputLimit = 50;    // FIXME: May want to rework this later for less duplicated code. ################################################
+                while (index < line.length()) {
+                    command = FileHandler::parseNextWord(index, line);
+                    FileHandler::skipWhitespace(index, line);
+                    if (command == "--limit") {
+                        if (index >= line.length()) {
+                            throw std::runtime_error("Missing value for \"--limit\".");
+                        }
+                        try {
+                            int n = FileHandler::parseNextInt(index, line);
+                            if (n < 0) {
+                                outputLimit = std::numeric_limits<size_t>::max();
+                            } else {
+                                outputLimit = static_cast<size_t>(n);
+                            }
+                        } catch (...) {
+                            throw std::runtime_error("Value for \"--limit\" must be integer.");
+                        }
+                        FileHandler::skipWhitespace(index, line);
+                    } else {
+                        throw std::runtime_error("Invalid parameter \"" + command + "\".");
+                    }
+                }
+                
+                app.startBackup(configFilename, outputLimit, false);
             } else if (command == "check") {
                 if (index >= line.length()) {
                     throw std::runtime_error("Missing path to config file.");
@@ -53,7 +80,31 @@ int main(int argc, char** argv) {
                 fs::path configFilename = FileHandler::parseNextPath(index, line);
                 FileHandler::skipWhitespace(index, line);
                 
-                app.checkBackup(configFilename);
+                unsigned int outputLimit = 50;
+                while (index < line.length()) {
+                    command = FileHandler::parseNextWord(index, line);
+                    FileHandler::skipWhitespace(index, line);
+                    if (command == "--limit") {
+                        if (index >= line.length()) {
+                            throw std::runtime_error("Missing value for \"--limit\".");
+                        }
+                        try {
+                            int n = FileHandler::parseNextInt(index, line);
+                            if (n < 0) {
+                                outputLimit = std::numeric_limits<size_t>::max();
+                            } else {
+                                outputLimit = static_cast<size_t>(n);
+                            }
+                        } catch (...) {
+                            throw std::runtime_error("Value for \"--limit\" must be integer.");
+                        }
+                        FileHandler::skipWhitespace(index, line);
+                    } else {
+                        throw std::runtime_error("Invalid parameter \"" + command + "\".");
+                    }
+                }
+                
+                app.checkBackup(configFilename, outputLimit);
             } else if (command == "tree") {
                 if (index >= line.length()) {
                     throw std::runtime_error("Missing path to config file.");
@@ -75,15 +126,16 @@ int main(int argc, char** argv) {
                 app.printPaths(configFilename, countOnly);
             } else if (command == "restore") {
                 
+                
+                if (index < line.length()) {
+                    throw std::runtime_error("Invalid parameter(s) \"" + line.substr(index) + "\".");
+                }
             } else if (command == "help") {
                 showHelp();
             } else if (command == "exit") {
                 break;
             } else {
                 throw std::runtime_error("Unknown command \"" + command + "\". Type \"help\" for command list.");
-            }
-            if (index < line.length()) {
-                throw std::runtime_error("Invalid parameter(s) \"" + line.substr(index) + "\".");
             }
         } catch (std::exception& ex) {
             std::cout << CSI::Red << "Error: " << ex.what() << CSI::Reset << "\n";

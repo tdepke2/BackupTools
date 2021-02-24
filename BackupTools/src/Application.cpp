@@ -7,10 +7,6 @@
 #include <map>
 #include <set>
 
-std::ostream& operator<<(std::ostream& out, CSI csiCode) {
-    return out << '\033' << '[' << static_cast<int>(csiCode) << 'm';
-}
-
 bool compareFileChange(const std::pair<fs::path, fs::path>& lhs, const std::pair<fs::path, fs::path>& rhs) {
     return compareFilename(lhs.second, rhs.second);
 }
@@ -41,14 +37,14 @@ void Application::printPaths(const fs::path& configFilename, const bool countOnl
         std::cout << "No files or directories found to track.\n";
         return;
     }
-    longestParentPath = nextPath.readAbsolute.parent_path().string();
+    longestParentPath = nextPath.readAbsolute.string();
     rootPaths.emplace(nextPath.readAbsolute.root_path());
     while (!nextPath.isEmpty()) {
         if (!readPathsMapping.emplace(nextPath.readAbsolute, nextPath.writePath / nextPath.readLocal).second) {
             std::cout << CSI::Yellow << "Warn: Skipping duplicate read path: " << nextPath.readAbsolute.string() << CSI::Reset << "\n";
         }
-        if (longestParentPath != nextPath.readAbsolute.parent_path().string().substr(0, longestParentPath.size())) {    // Update longestParentPath.
-            std::string currentParentPath = nextPath.readAbsolute.parent_path().string();
+        if (longestParentPath != nextPath.readAbsolute.string().substr(0, longestParentPath.size())) {    // Update longestParentPath.
+            std::string currentParentPath = nextPath.readAbsolute.string();
             for (size_t i = 0; i < longestParentPath.size(); ++i) {
                 if (i >= currentParentPath.size()) {
                     longestParentPath = currentParentPath;
@@ -67,7 +63,7 @@ void Application::printPaths(const fs::path& configFilename, const bool countOnl
     printTree(longestParentPath, readPathsMapping, countOnly);
 }
 
-Application::FileChanges Application::checkBackup(const fs::path& configFilename, bool displayConfirmation) {
+Application::FileChanges Application::checkBackup(const fs::path& configFilename, size_t outputLimit, bool displayConfirmation) {
     FileChanges changes;
     std::map<fs::path, std::set<fs::path>> writePathsChecklist;    // Maps a destination path to the current contents of that path.
     auto lastWritePathIter = writePathsChecklist.end();
@@ -112,32 +108,56 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     
     if (!changes.deletions.empty()) {
         std::cout << "Deletions:\n" << CSI::Red;
+        size_t i = 0;
         for (const auto& p : changes.deletions) {
+            if (i == outputLimit) {
+                std::cout << "    (and " << changes.deletions.size() - i << " more)\n";
+                break;
+            }
             std::cout << "-   " << p.string() << "\n";
+            ++i;
         }
         std::cout << CSI::Reset << "\n";
     }
     
     if (!changes.additions.empty()) {
         std::cout << "Additions:\n" << CSI::Green;
+        size_t i = 0;
         for (const auto& p : changes.additions) {
+            if (i == outputLimit) {
+                std::cout << "    (and " << changes.additions.size() - i << " more)\n";
+                break;
+            }
             std::cout << "+   " << p.second.string() << "\n";
+            ++i;
         }
         std::cout << CSI::Reset << "\n";
     }
     
     if (!changes.modifications.empty()) {
         std::cout << "Modifications:\n" << CSI::Yellow;
+        size_t i = 0;
         for (const auto& p : changes.modifications) {
+            if (i == outputLimit) {
+                std::cout << "    (and " << changes.modifications.size() - i << " more)\n";
+                break;
+            }
             std::cout << "*   " << p.second.string() << "\n";
+            ++i;
         }
         std::cout << CSI::Reset << "\n";
     }
     
     if (!changes.renames.empty()) {
         std::cout << "Renames:\n" << CSI::Magenta;
+        size_t i = 0;
         for (const auto& p : changes.renames) {
+            if (i == outputLimit) {
+                std::cout << "    (and " << changes.renames.size() - i << " more)\n";
+                break;
+            }
             std::cout << "~   " << p.first.string() << " -> " << p.second.string() << "\n";
+            ++i;
         }
         std::cout << CSI::Reset << "\n";
     }
@@ -157,12 +177,25 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
             std::cout << std::setw(5) << changes.renames.size() << " item(s) will be renamed.\n";
         }
         std::cout << "\nAre you sure? [Y/N] ";
+    } else {
+        if (!changes.deletions.empty()) {
+            std::cout << std::setw(5) << changes.deletions.size() << " item(s) to remove.\n";
+        }
+        if (!changes.additions.empty()) {
+            std::cout << std::setw(5) << changes.additions.size() << " item(s) to add.\n";
+        }
+        if (!changes.modifications.empty()) {
+            std::cout << std::setw(5) << changes.modifications.size() << " item(s) to modify.\n";
+        }
+        if (!changes.renames.empty()) {
+            std::cout << std::setw(5) << changes.renames.size() << " item(s) to rename.\n";
+        }
     }
     return changes;
 }
 
-void Application::startBackup(const fs::path& configFilename, bool forceBackup) {
-    FileChanges changes = checkBackup(configFilename, !forceBackup);
+void Application::startBackup(const fs::path& configFilename, size_t outputLimit, bool forceBackup) {
+    FileChanges changes = checkBackup(configFilename, outputLimit, !forceBackup);
     if (changes.isEmpty()) {
         return;
     }
@@ -220,6 +253,7 @@ void Application::printTree(const fs::path& searchPath, const std::map<fs::path,
 
 void Application::printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool printOutput, const std::string& prefix, PrintTreeStats* stats) {
     std::vector<fs::directory_entry> searchContents;
+    //std::priority_queue<fs::directory_entry, std::vector<fs::directory_entry>, decltype(&compareFilename)> searchContents(&compareFilename);    // Tested priority queue optimization, but turned out to be about 1.5 times slower.
     try {
         for (const auto& entry : fs::directory_iterator(searchPath)) {
             searchContents.emplace_back(entry);
@@ -237,6 +271,7 @@ void Application::printTree2(const fs::path& searchPath, const std::map<fs::path
         }
         return;
     }
+    
     std::sort(searchContents.begin(), searchContents.end(), compareFilename);
     for (size_t i = 0; i < searchContents.size(); ++i) {
         if (printOutput) {
@@ -286,11 +321,14 @@ void Application::optimizeForRenames(FileChanges& changes) {
             if (findResult != deletionsFileSizes.end()) {    // If file matches size of one of the deleted ones, check if contents match.
                 for (const fs::path& deletionPath : findResult->second) {
                     if (FileHandler::checkFileEquivalence(additionsIter->first, deletionPath)) {
-                        changes.renames.emplace(deletionPath, additionsIter->second);    // Found a match, add it as a rename and remove the corresponding addition and delete (subdirectories are not touched because fs::rename() expects existing directories).
-                        changes.deletions.erase(changes.deletions.find(deletionPath));
-                        additionsIter = changes.additions.erase(additionsIter);
-                        stepNextAddition = false;
-                        break;
+                        auto deletionsIter = changes.deletions.find(deletionPath);
+                        if (deletionsIter != changes.deletions.end()) {    // If corresponding deletion not found, rename cannot be done.
+                            changes.renames.emplace(deletionPath, additionsIter->second);    // Found a match, add it as a rename and remove the corresponding addition and deletion (subdirectories are not touched because fs::rename() expects existing directories).
+                            changes.deletions.erase(deletionsIter);
+                            additionsIter = changes.additions.erase(additionsIter);
+                            stepNextAddition = false;
+                            break;
+                        }
                     }
                 }
             }

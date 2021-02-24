@@ -10,6 +10,30 @@
 
 namespace fs = std::filesystem;
 
+enum CSI : int {    // Control Sequence Introducer used to set colors and formatting in terminal.
+    Reset = 0,      // https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_sequences
+    Bold = 1,
+    Underline = 4,
+    Inverse = 7,
+    Black = 30,
+    Red = 31,
+    Green = 32,
+    Yellow = 33,
+    Blue = 34,
+    Magenta = 35,
+    Cyan = 36,
+    White = 37,
+    BlackBG = 40,
+    RedBG = 41,
+    GreenBG = 42,
+    YellowBG = 43,
+    BlueBG = 44,
+    MagentaBG = 45,
+    CyanBG = 46,
+    WhiteBG = 47
+};
+std::ostream& operator<<(std::ostream& out, CSI csiCode);
+
 struct WriteReadPath {
     fs::path writePath;
     fs::path readAbsolute;
@@ -32,6 +56,7 @@ class FileHandler {
     static void skipWhitespace(std::string::size_type& index, const std::string& str);    // Increment index while space character found in str.
     static std::string parseNextWord(std::string::size_type& index, const std::string& str);    // Return next string in str until space found.
     static fs::path parseNextPath(std::string::size_type& index, const std::string& str);    // Return next path (considers paths wrapped in double quotes) and normalize it.
+    static int parseNextInt(std::string::size_type& index, const std::string& str);    // Return next integer in str.
     
     void loadConfigFile(const fs::path& filename);
     WriteReadPath getNextWriteReadPath();    // Get the next write/read combination from configFile_, or return empty paths if none left. Returned paths are stripped of regex and read path is unique and not contained in ignorePaths_.
