@@ -1,6 +1,12 @@
 Fixes:
     * globPortable() should respect already matched paths in previousReadPaths_ and ignore paths in ignorePaths_.
+    * Output for file errors should be more user friendly.
+    * Potential issue with rename optimization:
+        - Is renaming a file to itself allowed? It can happen currently.
+        - Can files be renamed in an illegal ordering? (a.txt -> b.txt then b.txt -> a.txt)
 
 Additions:
     * Add option to include hidden files with ? and *.
+        - It's in the code now, just need config option to set it.
     * Catch SIGINT to gracefully stop.
+    * Warn user against recursive backups (detection should probably go in rename optimization code).

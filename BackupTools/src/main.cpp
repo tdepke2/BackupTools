@@ -2,6 +2,7 @@
 #include "FileHandler.h"
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -14,14 +15,14 @@ namespace fs = std::filesystem;
 void showHelp() {
     std::cout << "Options:\n";
     std::cout << "  backup <config file> [--limit n]    Starts a backup.\n";
-    std::cout << "      --limit n                       Limits output to n lines (50 by default). Use -1 for no limit.\n";
+    std::cout << "    --limit n                           Limits output to n lines (50 by default). Use -1 for no limit.\n";
     std::cout << "  check <config file> [--limit n]     Checks backup status.\n";
-    std::cout << "      --limit n                       Limits output to n lines (50 by default). Use -1 for no limit.\n";
-    std::cout << "  tree <config file> [--count]    Displays tree of tracked files.\n";
-    std::cout << "      --count                     Only display the total count.\n";
-    std::cout << "  restore <config file>           Restores a backup.\n";
-    std::cout << "  help                            Shows this menu.\n";
-    std::cout << "  exit                            Exits interactive shell.\n";
+    std::cout << "    --limit n                           Limits output to n lines (50 by default). Use -1 for no limit.\n";
+    std::cout << "  tree <config file> [--count]        Displays tree of tracked files.\n";
+    std::cout << "    --count                             Only display the total count.\n";
+    std::cout << "  restore <config file>               Restores a backup.\n";
+    std::cout << "  help                                Shows this menu.\n";
+    std::cout << "  exit                                Exits interactive shell.\n";
 }
 
 int main(int argc, char** argv) {
@@ -59,9 +60,9 @@ int main(int argc, char** argv) {
                         try {
                             int n = FileHandler::parseNextInt(index, line);
                             if (n < 0) {
-                                outputLimit = std::numeric_limits<size_t>::max();
+                                outputLimit = std::numeric_limits<unsigned int>::max();
                             } else {
-                                outputLimit = static_cast<size_t>(n);
+                                outputLimit = static_cast<unsigned int>(n);
                             }
                         } catch (...) {
                             throw std::runtime_error("Value for \"--limit\" must be integer.");
@@ -91,9 +92,9 @@ int main(int argc, char** argv) {
                         try {
                             int n = FileHandler::parseNextInt(index, line);
                             if (n < 0) {
-                                outputLimit = std::numeric_limits<size_t>::max();
+                                outputLimit = std::numeric_limits<unsigned int>::max();
                             } else {
-                                outputLimit = static_cast<size_t>(n);
+                                outputLimit = static_cast<unsigned int>(n);
                             }
                         } catch (...) {
                             throw std::runtime_error("Value for \"--limit\" must be integer.");
