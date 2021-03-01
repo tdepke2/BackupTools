@@ -73,7 +73,7 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
         if (lastWritePathIter == writePathsChecklist.end() || lastWritePathIter->first != nextPath.writePath) {    // Check if the write path changed and add directory contents if it is a new path.
             auto insertResult = writePathsChecklist.emplace(nextPath.writePath, std::set<fs::path>());
             if (insertResult.second) {
-                for (const auto& entry : fs::recursive_directory_iterator(nextPath.writePath)) {
+                for (const auto& entry : fs::recursive_directory_iterator(nextPath.writePath)) {    // If exception during iteration of write path, checkBackup() must stop.
                     insertResult.first->second.emplace(entry.path());
                 }
             }
@@ -319,16 +319,15 @@ void Application::optimizeForRenames(FileChanges& changes) {
         if (fs::is_regular_file(additionsIter->first)) {
             auto findResult = deletionsFileSizes.find(fs::file_size(additionsIter->first));
             if (findResult != deletionsFileSizes.end()) {    // If file matches size of one of the deleted ones, check if contents match.
-                for (const fs::path& deletionPath : findResult->second) {
-                    if (FileHandler::checkFileEquivalence(additionsIter->first, deletionPath)) {
-                        auto deletionsIter = changes.deletions.find(deletionPath);
-                        if (deletionsIter != changes.deletions.end()) {    // If corresponding deletion not found, rename cannot be done.
-                            changes.renames.emplace(deletionPath, additionsIter->second);    // Found a match, add it as a rename and remove the corresponding addition and deletion (subdirectories are not touched because fs::rename() expects existing directories).
-                            changes.deletions.erase(deletionsIter);
-                            additionsIter = changes.additions.erase(additionsIter);
-                            stepNextAddition = false;
-                            break;
-                        }
+                for (auto deletionsSetIter = findResult->second.begin(); deletionsSetIter != findResult->second.end(); ++deletionsSetIter) {
+                    if (FileHandler::checkFileEquivalence(additionsIter->first, *deletionsSetIter)) {
+                        changes.renames.emplace(*deletionsSetIter, additionsIter->second);    // Found a match, add it as a rename and remove the corresponding addition and deletion (subdirectories are not touched because fs::rename() expects existing directories).
+                        auto deletionsIter = changes.deletions.find(*deletionsSetIter);
+                        changes.deletions.erase(deletionsIter);
+                        findResult->second.erase(deletionsSetIter);
+                        additionsIter = changes.additions.erase(additionsIter);
+                        stepNextAddition = false;
+                        break;
                     }
                 }
             }

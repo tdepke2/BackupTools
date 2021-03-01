@@ -317,7 +317,7 @@ bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& d
         return false;
     }
     
-    sourceFile.seekg(0);
+    sourceFile.seekg(0);    // Return to beginning of files.
     destFile.seekg(0);
     
     std::istreambuf_iterator<char> sourceIter(sourceFile);

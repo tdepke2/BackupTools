@@ -43,7 +43,7 @@ class Application {
     
     static void printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool countOnly);
     static void printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool printOutput, const std::string& prefix, PrintTreeStats* stats);
-    static void optimizeForRenames(FileChanges& changes);
+    static void optimizeForRenames(FileChanges& changes);    // Modifies changes so that files that are equivalent and have different paths are removed from changes.deletions/changes.additions and added to changes.renames.
 };
 
 #endif
