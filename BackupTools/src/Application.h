@@ -25,7 +25,7 @@ class Application {
     
     static bool checkUserConfirmation();    // Gets user input and returns true only if any variant of "yes" was entered.
     void printPaths(const fs::path& configFilename, const bool countOnly);
-    FileChanges checkBackup(const fs::path& configFilename, size_t outputLimit, bool displayConfirmation = false);
+    FileChanges checkBackup(const fs::path& configFilename, size_t outputLimit, bool displayConfirmation = false, bool silent = false);
     void startBackup(const fs::path& configFilename, size_t outputLimit, bool forceBackup);
     void restoreFromBackup(const fs::path& configFilename);
     

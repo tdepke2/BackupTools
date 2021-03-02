@@ -63,7 +63,7 @@ void Application::printPaths(const fs::path& configFilename, const bool countOnl
     printTree(longestParentPath, readPathsMapping, countOnly);
 }
 
-Application::FileChanges Application::checkBackup(const fs::path& configFilename, size_t outputLimit, bool displayConfirmation) {
+Application::FileChanges Application::checkBackup(const fs::path& configFilename, size_t outputLimit, bool displayConfirmation, bool silent) {
     FileChanges changes;
     std::map<fs::path, std::set<fs::path>> writePathsChecklist;    // Maps a destination path to the current contents of that path.
     auto lastWritePathIter = writePathsChecklist.end();
@@ -99,12 +99,14 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     }
     writePathsChecklist.clear();
     
-    if (changes.isEmpty()) {
+    optimizeForRenames(changes);
+    
+    if (silent) {
+        return changes;
+    } else if (changes.isEmpty()) {
         std::cout << "All up to date.\n";
         return changes;
     }
-    
-    optimizeForRenames(changes);
     
     if (!changes.deletions.empty()) {
         std::cout << "Deletions:\n" << CSI::Red;
@@ -195,15 +197,13 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
 }
 
 void Application::startBackup(const fs::path& configFilename, size_t outputLimit, bool forceBackup) {
-    FileChanges changes = checkBackup(configFilename, outputLimit, !forceBackup);
+    FileChanges changes = checkBackup(configFilename, outputLimit, true, forceBackup);
     if (changes.isEmpty()) {
         return;
     }
-    if (!forceBackup) {
-        if (!checkUserConfirmation()) {
-            std::cout << "Backup canceled.\n";
-            return;
-        }
+    if (!forceBackup && !checkUserConfirmation()) {
+        std::cout << "Backup canceled.\n";
+        return;
     }
     
     for (const auto& p : changes.additions) {
@@ -228,6 +228,14 @@ void Application::startBackup(const fs::path& configFilename, size_t outputLimit
     for (const auto& p : changes.modifications) {
         std::cout << "Replacing " << p.second.string() << "\n";
         fs::copy(p.first, p.second, fs::copy_options::overwrite_existing);
+    }
+    
+    if (!forceBackup) {
+        FileChanges changesAfter = checkBackup(configFilename, outputLimit, true, true);
+        if (!changesAfter.isEmpty()) {
+            std::cout << "\n" << CSI::Yellow << "Warning: Found remaining changes after running backup. This may have been caused by an error during\n";
+            std::cout << "file operations or recursive rules in the config file. Run \"check <config file>\" for more details." << CSI::Reset << "\n";
+        }
     }
 }
 
