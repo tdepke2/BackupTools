@@ -4,6 +4,4 @@ Fixes:
     * Commands in "main.cpp" should not share state between calls to support CLI behavior.
 
 Additions:
-    * Add option to include hidden files with ? and *.
-        - It's in the code now, just need config option to set it.
     * Catch SIGINT to gracefully stop.

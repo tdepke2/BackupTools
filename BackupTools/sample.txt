@@ -1,3 +1,5 @@
+#set match-hidden false
+
 root x dest
 
 # Add all in current directory.

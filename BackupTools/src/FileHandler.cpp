@@ -8,7 +8,7 @@
 #include <stdexcept>
 
 char FileHandler::pathSeparator = std::filesystem::path::preferred_separator;
-bool FileHandler::globMatchesHiddenFiles = false;
+bool FileHandler::globMatchesHiddenFiles = true;
 
 std::ostream& operator<<(std::ostream& out, CSI csiCode) {
     return out << '\033' << '[' << static_cast<int>(csiCode) << 'm';
@@ -376,6 +376,22 @@ int FileHandler::parseNextInt(std::string::size_type& index, const std::string& 
     return stoi(str.substr(start));
 }
 
+bool FileHandler::parseNextBool(std::string::size_type& index, const std::string& str) {
+    std::string nextWord = "";
+    std::string::size_type start = index;
+    while (index < str.length() && str[index] != ' ') {
+        nextWord.push_back(std::tolower(static_cast<unsigned char>(str[index])));
+        ++index;
+    }
+    if (nextWord == "false" || nextWord == "f" || nextWord == "0" || nextWord == "no" || nextWord == "n") {
+        return false;
+    } else if (nextWord == "true" || nextWord == "t" || nextWord == "1" || nextWord == "yes" || nextWord == "y") {
+        return true;
+    } else {
+        throw std::runtime_error("Cannot convert argument to bool.");
+    }
+}
+
 void FileHandler::loadConfigFile(const fs::path& filename) {
     if (configFile_.is_open()) {
         configFile_.close();
@@ -384,6 +400,8 @@ void FileHandler::loadConfigFile(const fs::path& filename) {
     if (!configFile_.is_open()) {
         throw std::runtime_error("\"" + filename.string() + "\": Unable to open file for reading.");
     }
+    
+    globMatchesHiddenFiles = true;
     
     configFilename_ = filename;
     lineNumber_ = 0;
@@ -467,7 +485,21 @@ void FileHandler::parseNextLineInFile() {
         
         std::string command = parseNextWord(index, line);
         skipWhitespace(index, line);
-        if (command == "root") {    // Syntax: root <identifier> <replacement path>
+        if (command == "set") {    // Syntax: set <option> <value>
+            if (index >= line.length()) {
+                throw std::runtime_error("Missing option parameter.");
+            }
+            std::string option = parseNextWord(index, line);
+            skipWhitespace(index, line);
+            if (option == "match-hidden") {    // Controls matching of hidden files when using wildcard matching.
+                if (index >= line.length()) {
+                    throw std::runtime_error("Missing value for \"" + option + "\".");
+                }
+                globMatchesHiddenFiles = parseNextBool(index, line);
+            } else {
+                throw std::runtime_error("Invalid option \"" + option + "\".");
+            }
+        } else if (command == "root") {    // Syntax: root <identifier> <replacement path>
             if (index >= line.length()) {
                 throw std::runtime_error("Missing identifier path parameter.");
             }

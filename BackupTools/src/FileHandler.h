@@ -57,6 +57,7 @@ class FileHandler {
     static std::string parseNextWord(std::string::size_type& index, const std::string& str);    // Return next string in str until space found.
     static fs::path parseNextPath(std::string::size_type& index, const std::string& str);    // Return next path (considers paths wrapped in double quotes) and normalize it.
     static int parseNextInt(std::string::size_type& index, const std::string& str);    // Return next integer in str.
+    static bool parseNextBool(std::string::size_type& index, const std::string& str);    // Return next bool in str.
     
     void loadConfigFile(const fs::path& filename);
     WriteReadPath getNextWriteReadPath();    // Get the next write/read combination from configFile_, or return empty paths if none left. Returned paths are stripped of regex and read path is unique and not contained in ignorePaths_.
