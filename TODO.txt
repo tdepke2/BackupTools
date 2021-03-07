@@ -1,7 +1,6 @@
 Fixes:
     * globPortable() should respect already matched paths in previousReadPaths_ and ignore paths in ignorePaths_.
     * Output for file errors should be more user friendly.
-    * Commands in "main.cpp" should not share state between calls to support CLI behavior.
 
 Additions:
     * Catch SIGINT to gracefully stop.

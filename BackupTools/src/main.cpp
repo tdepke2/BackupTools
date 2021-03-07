@@ -26,13 +26,11 @@ void showHelp() {
 }
 
 int main(int argc, char** argv) {
-    Application app;
-    
     showHelp();
-    std::string line;
     while (true) {
         try {
             std::cout << "\n>>> ";
+            std::string line;
             std::getline(std::cin, line);
             
             std::string::size_type index = 0;
@@ -73,6 +71,7 @@ int main(int argc, char** argv) {
                     }
                 }
                 
+                Application app;
                 app.startBackup(configFilename, outputLimit, false);
             } else if (command == "check") {
                 if (index >= line.length()) {
@@ -105,6 +104,7 @@ int main(int argc, char** argv) {
                     }
                 }
                 
+                Application app;
                 app.checkBackup(configFilename, outputLimit);
             } else if (command == "tree") {
                 if (index >= line.length()) {
@@ -124,6 +124,7 @@ int main(int argc, char** argv) {
                     }
                 }
                 
+                Application app;
                 app.printPaths(configFilename, countOnly);
             } else if (command == "restore") {
                 
