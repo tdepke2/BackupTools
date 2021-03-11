@@ -197,15 +197,15 @@ bool FileHandler::containsWildcard(char const* pattern) {
 
 /** Globbing details:
     If last directory name does not contain wildcards, the directory is matched recursively (and all files stem from the directory name).
-    * will skip directories (even empty ones) when used in last directory name.
-    ** will include everything (matches zero to n directories and files). Similar to just putting the directory name, but files do not stem from the name.
+    * will match any one file or directory name.
+    ** will match everything (matches zero to n directories and files). Similar to just putting the directory name, but files do not stem from the name.
         For simplicity, ** only works when by itself in a sub-path.
     For file/directory specific matching, the rules in fnmatchPortable() apply.
 */
 std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pattern) {
     std::vector<std::pair<fs::path, fs::path>> result;
     
-    if (pattern.root_directory().empty()) {    // If pattern is relative, make it absolute.
+    if (pattern.is_relative()) {    // If pattern is relative, make it absolute.
         pattern = (fs::current_path() / pattern).lexically_normal();
     }
     bool addedTrailingGlobstar = false;
@@ -244,16 +244,39 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
     }
     std::string::size_type dirPrefixOffset = directoryPrefix.string().length() + 1;
     
-    std::stack<fs::path> pathStack;
+    std::stack<fs::path> pathStack;    // Stacks for recursive directory matching process.
     pathStack.push(directoryPrefix);
     std::stack<fs::path::iterator> iterStack;
     iterStack.push(patternIter);
+    std::stack<std::vector<fs::path::iterator>> ignoreIterStack;
+    ignoreIterStack.push({});
+    
+    std::vector<fs::path> ignorePathsCopy;    // Make a copy of ignorePaths_ but append a globstar to local paths.
+    ignorePathsCopy.reserve(ignorePaths_.size());
+    for (const auto& p : ignorePaths_) {
+        if (p.is_relative()) {
+            ignorePathsCopy.push_back("**" / p);
+        } else {
+            ignorePathsCopy.push_back(p);
+        }
+        ignoreIterStack.top().push_back(ignorePathsCopy.back().begin());    // Add iterator to ignoreIterStack.
+    }
+    
+    for (const auto& p : directoryPrefix) {    // Step through directoryPrefix to determine if an ignore matches it.
+        for (size_t i = 0; i < ignoreIterStack.top().size(); ++i) {
+            if (checkPathIgnored(ignorePathsCopy[i], ignoreIterStack.top()[i], p)) {
+                return result;
+            }
+        }
+    }
     
     while (!pathStack.empty()) {    // Recursive operation to iterate through matching directories.
         fs::path pathTraversal = pathStack.top();    // The matched path thus far.
         pathStack.pop();
         fs::path::iterator currentPatternIter = iterStack.top();    // Iterator to the current sub-path.
         iterStack.pop();
+        std::vector<fs::path::iterator> ignoreIters = ignoreIterStack.top();    // Iterators to the current positions in ignorePathsCopy.
+        ignoreIterStack.pop();
         
         if (currentPatternIter == pattern.end()) {
             continue;
@@ -273,21 +296,34 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
             
             pathStack.push(pathTraversal);
             iterStack.push(nextPatternIter);
+            ignoreIterStack.push(ignoreIters);
             nextPatternIter = currentPatternIter;
         }
         
         try {
             for (const auto& entry : fs::directory_iterator(pathTraversal)) {
                 if (fnmatchSimple(currentPatternIter->string().c_str(), entry.path().filename().string().c_str(), matchAllPaths)) {
-                    //std::cout << "Matched " << entry.path() << "\n";
-                    if (addToResult) {
-                        fs::path nextPathTraversal = pathTraversal / entry.path().filename();
-                        result.emplace_back(nextPathTraversal, nextPathTraversal.string().substr(dirPrefixOffset));
+                    bool includeThisPath = true;    // Check if path (and derived ones) can be ignored.
+                    std::vector<fs::path::iterator> ignoreItersNext = ignoreIters;
+                    for (size_t i = 0; i < ignoreItersNext.size(); ++i) {
+                        if (checkPathIgnored(ignorePathsCopy[i], ignoreItersNext[i], entry.path().filename())) {
+                            includeThisPath = false;
+                            break;
+                        }
                     }
-                    if (entry.is_directory()) {
-                        pathStack.push(pathTraversal / entry.path().filename());
-                        iterStack.push(nextPatternIter);
-                        //std::cout << "    " << pathStack.top() << "\n";
+                    
+                    if (includeThisPath) {
+                        //std::cout << "Matched " << entry.path() << "\n";
+                        if (addToResult) {
+                            fs::path nextPathTraversal = pathTraversal / entry.path().filename();
+                            result.emplace_back(nextPathTraversal, nextPathTraversal.string().substr(dirPrefixOffset));
+                        }
+                        if (entry.is_directory()) {
+                            pathStack.push(pathTraversal / entry.path().filename());
+                            iterStack.push(nextPatternIter);
+                            ignoreIterStack.push(std::move(ignoreItersNext));
+                            //std::cout << "    " << pathStack.top() << "\n";
+                        }
                     }
                 }
             }
@@ -444,6 +480,29 @@ WriteReadPath FileHandler::getNextWriteReadPath() {
     return result;
 }
 
+bool FileHandler::checkPathIgnored(const fs::path& ignorePath, fs::path::iterator& ignoreIter, const fs::path& currentSubPath) {
+    if (ignoreIter == ignorePath.end()) {    // End iterator means match failed previously.
+        return false;
+    }
+    while (ignoreIter != ignorePath.end() && *ignoreIter == fs::path("**")) {    // Skip any globstars.
+        ++ignoreIter;
+    }
+    if (ignoreIter == ignorePath.end() || ignoreIter->empty()) {    // Globstar matched the path. Note that an ignore path that ends with a directory separator also ends with an empty path.
+        return true;
+    } else if (fnmatchSimple(ignoreIter->string().c_str(), currentSubPath.string().c_str())) {    // Else if sub-path matched, ignore succeeds if it's at the end.
+        ++ignoreIter;
+        return ignoreIter == ignorePath.end() || ignoreIter->empty();    // Note: If a globstar still remains, then we don't ignore the current sub-path. This matches the behavior of path matching in globPortable().
+    }
+    
+    while (ignoreIter != ignorePath.begin() && *ignoreIter != fs::path("**")) {    // Sub-path not matched, rewind to find globstar.
+        --ignoreIter;
+    }
+    if (*ignoreIter != fs::path("**")) {    // No globstar, the match failed indefinitely.
+        ignoreIter = ignorePath.end();
+    }
+    return false;
+}
+
 fs::path FileHandler::substituteRootPath(const fs::path& path) {
     auto pathIter = path.begin();
     if (pathIter != path.end()) {
@@ -476,7 +535,7 @@ void FileHandler::parseNextLineInFile() {
         if (firstNonSpace != std::string::npos && firstNonSpace != 0) {
             line.erase(0, firstNonSpace);
         }*/
-        std::string::size_type index = 0;
+        std::string::size_type index = 0;    // FIXME: Maybe skipWhitespace() should be included in parse functions. ################################################################
         skipWhitespace(index, line);
         //std::cout << "Line " << lineNumber_ << ": [" << line << "]\n";
         if (index >= line.length() || line[index] == '#') {

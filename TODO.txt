@@ -1,6 +1,7 @@
 Fixes:
     * globPortable() should respect already matched paths in previousReadPaths_ and ignore paths in ignorePaths_.
     * Output for file errors should be more user friendly.
+    * Warn against missing ignore when using include command.
 
 Additions:
     * Catch SIGINT to gracefully stop.
