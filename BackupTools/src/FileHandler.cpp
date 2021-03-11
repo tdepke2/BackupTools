@@ -195,148 +195,6 @@ bool FileHandler::containsWildcard(char const* pattern) {
     return false;
 }
 
-/** Globbing details:
-    If last directory name does not contain wildcards, the directory is matched recursively (and all files stem from the directory name).
-    * will match any one file or directory name.
-    ** will match everything (matches zero to n directories and files). Similar to just putting the directory name, but files do not stem from the name.
-        For simplicity, ** only works when by itself in a sub-path.
-    For file/directory specific matching, the rules in fnmatchPortable() apply.
-*/
-std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pattern) {
-    std::vector<std::pair<fs::path, fs::path>> result;
-    
-    if (pattern.is_relative()) {    // If pattern is relative, make it absolute.
-        pattern = (fs::current_path() / pattern).lexically_normal();
-    }
-    bool addedTrailingGlobstar = false;
-    if (!containsWildcard(pattern.filename().string().c_str())) {    // If last sub-path is not a glob, assume it is a directory and match contents recursively.
-        pattern /= "**";
-        addedTrailingGlobstar = true;
-    }
-    
-    auto patternIter = pattern.begin();
-    if (pattern.has_root_name()) {    // Skip root name.
-        ++patternIter;
-        if (patternIter == pattern.end()) {
-            return result;
-        }
-    }
-    ++patternIter;    // Skip root directory.
-    if (patternIter == pattern.end()) {
-        return result;
-    }
-    
-    fs::path directoryPrefix = pattern.root_path();
-    auto patternIter2 = patternIter;
-    ++patternIter2;
-    
-    while (patternIter2 != pattern.end() && !containsWildcard(patternIter2->string().c_str())) {    // Determine the directoryPrefix (the longest path in the pattern without wildcards).
-        directoryPrefix /= *patternIter;
-        patternIter = patternIter2;
-        ++patternIter2;
-    }
-    if (!addedTrailingGlobstar) {
-        directoryPrefix /= *patternIter;
-        ++patternIter;
-    }
-    if (!fs::exists(directoryPrefix)) {
-        return result;
-    }
-    std::string::size_type dirPrefixOffset = directoryPrefix.string().length() + 1;
-    
-    std::stack<fs::path> pathStack;    // Stacks for recursive directory matching process.
-    pathStack.push(directoryPrefix);
-    std::stack<fs::path::iterator> iterStack;
-    iterStack.push(patternIter);
-    std::stack<std::vector<fs::path::iterator>> ignoreIterStack;
-    ignoreIterStack.push({});
-    
-    std::vector<fs::path> ignorePathsCopy;    // Make a copy of ignorePaths_ but append a globstar to local paths.
-    ignorePathsCopy.reserve(ignorePaths_.size());
-    for (const auto& p : ignorePaths_) {
-        if (p.is_relative()) {
-            ignorePathsCopy.push_back("**" / p);
-        } else {
-            ignorePathsCopy.push_back(p);
-        }
-        ignoreIterStack.top().push_back(ignorePathsCopy.back().begin());    // Add iterator to ignoreIterStack.
-    }
-    
-    for (const auto& p : directoryPrefix) {    // Step through directoryPrefix to determine if an ignore matches it.
-        for (size_t i = 0; i < ignoreIterStack.top().size(); ++i) {
-            if (checkPathIgnored(ignorePathsCopy[i], ignoreIterStack.top()[i], p)) {
-                return result;
-            }
-        }
-    }
-    
-    while (!pathStack.empty()) {    // Recursive operation to iterate through matching directories.
-        fs::path pathTraversal = pathStack.top();    // The matched path thus far.
-        pathStack.pop();
-        fs::path::iterator currentPatternIter = iterStack.top();    // Iterator to the current sub-path.
-        iterStack.pop();
-        std::vector<fs::path::iterator> ignoreIters = ignoreIterStack.top();    // Iterators to the current positions in ignorePathsCopy.
-        ignoreIterStack.pop();
-        
-        if (currentPatternIter == pattern.end()) {
-            continue;
-        }
-        
-        //std::cout << "Current pathTraversal is " << pathTraversal << "\n";
-        //std::cout << "Current sub-pattern is " << *currentPatternIter << "\n";
-        fs::path::iterator nextPatternIter = std::next(currentPatternIter);
-        
-        bool matchAllPaths = false;
-        bool addToResult = true;
-        if (*currentPatternIter == fs::path("**")) {    // If this sub-pattern is a globstar, match current path with the next sub-pattern and all contained directories with the current sub-pattern.
-            matchAllPaths = true;
-            if (nextPatternIter != pattern.end()) {
-                addToResult = false;
-            }
-            
-            pathStack.push(pathTraversal);
-            iterStack.push(nextPatternIter);
-            ignoreIterStack.push(ignoreIters);
-            nextPatternIter = currentPatternIter;
-        }
-        
-        try {
-            for (const auto& entry : fs::directory_iterator(pathTraversal)) {
-                if (fnmatchSimple(currentPatternIter->string().c_str(), entry.path().filename().string().c_str(), matchAllPaths)) {
-                    bool includeThisPath = true;    // Check if path (and derived ones) can be ignored.
-                    std::vector<fs::path::iterator> ignoreItersNext = ignoreIters;
-                    for (size_t i = 0; i < ignoreItersNext.size(); ++i) {
-                        if (checkPathIgnored(ignorePathsCopy[i], ignoreItersNext[i], entry.path().filename())) {
-                            includeThisPath = false;
-                            break;
-                        }
-                    }
-                    
-                    if (includeThisPath) {
-                        //std::cout << "Matched " << entry.path() << "\n";
-                        if (addToResult) {
-                            fs::path nextPathTraversal = pathTraversal / entry.path().filename();
-                            result.emplace_back(nextPathTraversal, nextPathTraversal.string().substr(dirPrefixOffset));
-                        }
-                        if (entry.is_directory()) {
-                            pathStack.push(pathTraversal / entry.path().filename());
-                            iterStack.push(nextPatternIter);
-                            ignoreIterStack.push(std::move(ignoreItersNext));
-                            //std::cout << "    " << pathStack.top() << "\n";
-                        }
-                    }
-                }
-            }
-        } catch (std::exception& ex) {    // Exception accessing path can be ignored (treat it like an empty directory).
-            std::cout << CSI::Red << "Error: " << ex.what() << CSI::Reset << "\n";
-        }
-        
-        //std::cout << "========================================\n";
-    }
-    
-    return result;
-}
-
 bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& dest) {    // Based on https://stackoverflow.com/questions/15118661/in-c-whats-the-fastest-way-to-tell-whether-two-string-or-binary-files-are-di
     std::ifstream sourceFile(source, std::ios::ate | std::ios::binary);    // Open files in binary mode and seek to end.
     std::ifstream destFile(dest, std::ios::ate | std::ios::binary);
@@ -475,6 +333,148 @@ WriteReadPath FileHandler::getNextWriteReadPath() {
     if (globPortableResultsIndex_ >= globPortableResults_.size()) {
         globPortableResults_.clear();
         readPathSet_ = false;
+    }
+    
+    return result;
+}
+
+/** Globbing details:
+    If last directory name does not contain wildcards, the directory is matched recursively (and all files stem from the directory name).
+    * will match any one file or directory name.
+    ** will match everything (matches zero to n directories and files). Similar to just putting the directory name, but files do not stem from the name.
+        For simplicity, ** only works when by itself in a sub-path.
+    For file/directory specific matching, the rules in fnmatchPortable() apply.
+*/
+std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pattern) {
+    std::vector<std::pair<fs::path, fs::path>> result;
+    
+    if (pattern.is_relative()) {    // If pattern is relative, make it absolute.
+        pattern = (fs::current_path() / pattern).lexically_normal();
+    }
+    bool addedTrailingGlobstar = false;
+    if (!containsWildcard(pattern.filename().string().c_str())) {    // If last sub-path is not a glob, assume it is a directory and match contents recursively.
+        pattern /= "**";
+        addedTrailingGlobstar = true;
+    }
+    
+    auto patternIter = pattern.begin();
+    if (pattern.has_root_name()) {    // Skip root name.
+        ++patternIter;
+        if (patternIter == pattern.end()) {
+            return result;
+        }
+    }
+    ++patternIter;    // Skip root directory.
+    if (patternIter == pattern.end()) {
+        return result;
+    }
+    
+    fs::path directoryPrefix = pattern.root_path();
+    auto patternIter2 = patternIter;
+    ++patternIter2;
+    
+    while (patternIter2 != pattern.end() && !containsWildcard(patternIter2->string().c_str())) {    // Determine the directoryPrefix (the longest path in the pattern without wildcards).
+        directoryPrefix /= *patternIter;
+        patternIter = patternIter2;
+        ++patternIter2;
+    }
+    if (!addedTrailingGlobstar) {
+        directoryPrefix /= *patternIter;
+        ++patternIter;
+    }
+    if (!fs::exists(directoryPrefix)) {
+        return result;
+    }
+    std::string::size_type dirPrefixOffset = directoryPrefix.string().length() + 1;
+    
+    std::stack<fs::path> pathStack;    // Stacks for recursive directory matching process.
+    pathStack.push(directoryPrefix);
+    std::stack<fs::path::iterator> iterStack;
+    iterStack.push(patternIter);
+    std::stack<std::vector<fs::path::iterator>> ignoreIterStack;
+    ignoreIterStack.push({});
+    
+    std::vector<fs::path> ignorePathsCopy;    // Make a copy of ignorePaths_ but append a globstar to local paths.
+    ignorePathsCopy.reserve(ignorePaths_.size());
+    for (const auto& p : ignorePaths_) {
+        if (p.is_relative()) {
+            ignorePathsCopy.push_back("**" / p);
+        } else {
+            ignorePathsCopy.push_back(p);
+        }
+        ignoreIterStack.top().push_back(ignorePathsCopy.back().begin());    // Add iterator to ignoreIterStack.
+    }
+    
+    for (const auto& p : directoryPrefix) {    // Step through directoryPrefix to determine if an ignore matches it.
+        for (size_t i = 0; i < ignoreIterStack.top().size(); ++i) {
+            if (checkPathIgnored(ignorePathsCopy[i], ignoreIterStack.top()[i], p)) {
+                return result;
+            }
+        }
+    }
+    
+    while (!pathStack.empty()) {    // Recursive operation to iterate through matching directories.
+        fs::path pathTraversal = pathStack.top();    // The matched path thus far.
+        pathStack.pop();
+        fs::path::iterator currentPatternIter = iterStack.top();    // Iterator to the current sub-path.
+        iterStack.pop();
+        std::vector<fs::path::iterator> ignoreIters = ignoreIterStack.top();    // Iterators to the current positions in ignorePathsCopy.
+        ignoreIterStack.pop();
+        
+        if (currentPatternIter == pattern.end()) {
+            continue;
+        }
+        
+        //std::cout << "Current pathTraversal is " << pathTraversal << "\n";
+        //std::cout << "Current sub-pattern is " << *currentPatternIter << "\n";
+        fs::path::iterator nextPatternIter = std::next(currentPatternIter);
+        
+        bool matchAllPaths = false;
+        bool addToResult = true;
+        if (*currentPatternIter == fs::path("**")) {    // If this sub-pattern is a globstar, match current path with the next sub-pattern and all contained directories with the current sub-pattern.
+            matchAllPaths = true;
+            if (nextPatternIter != pattern.end()) {
+                addToResult = false;
+            }
+            
+            pathStack.push(pathTraversal);
+            iterStack.push(nextPatternIter);
+            ignoreIterStack.push(ignoreIters);
+            nextPatternIter = currentPatternIter;
+        }
+        
+        try {
+            for (const auto& entry : fs::directory_iterator(pathTraversal)) {
+                if (fnmatchSimple(currentPatternIter->string().c_str(), entry.path().filename().string().c_str(), matchAllPaths)) {
+                    bool includeThisPath = true;    // Check if path (and derived ones) can be ignored.
+                    std::vector<fs::path::iterator> ignoreItersNext = ignoreIters;
+                    for (size_t i = 0; i < ignoreItersNext.size(); ++i) {
+                        if (checkPathIgnored(ignorePathsCopy[i], ignoreItersNext[i], entry.path().filename())) {
+                            includeThisPath = false;
+                            break;
+                        }
+                    }
+                    
+                    if (includeThisPath) {
+                        //std::cout << "Matched " << entry.path() << "\n";
+                        if (addToResult) {
+                            fs::path nextPathTraversal = pathTraversal / entry.path().filename();
+                            result.emplace_back(nextPathTraversal, nextPathTraversal.string().substr(dirPrefixOffset));
+                        }
+                        if (entry.is_directory()) {
+                            pathStack.push(pathTraversal / entry.path().filename());
+                            iterStack.push(nextPatternIter);
+                            ignoreIterStack.push(std::move(ignoreItersNext));
+                            //std::cout << "    " << pathStack.top() << "\n";
+                        }
+                    }
+                }
+            }
+        } catch (std::exception& ex) {    // Exception accessing path can be ignored (treat it like an empty directory).
+            std::cout << CSI::Red << "Error: " << ex.what() << CSI::Reset << "\n";
+        }
+        
+        //std::cout << "========================================\n";
     }
     
     return result;
