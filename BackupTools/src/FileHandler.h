@@ -60,7 +60,8 @@ class FileHandler {
     
     void loadConfigFile(const fs::path& filename);
     WriteReadPath getNextWriteReadPath();    // Get the next write/read combination from configFile_, or return empty paths if none left. Returned paths are stripped of regex and read path is unique and not contained in ignorePaths_.
-    std::vector<std::pair<fs::path, fs::path>> globPortable(fs::path pattern);    // Returns a list of absolute/local paths that match the pattern. The pattern must be in normal form.
+    std::vector<std::pair<fs::path, fs::path>> globPortable(fs::path pattern) const;    // Returns a list of absolute/local paths that match the pattern. The pattern must be in normal form.
+    bool checkPathIgnored(const fs::path& p) const;    // Iterates through all of ignorePaths_ and determines if there is a match. The complexity is O(N*M) so use carefully.
     
     private:
     std::ifstream configFile_;
@@ -74,7 +75,7 @@ class FileHandler {
     fs::path writePath_, readPath_;
     bool writePathSet_, readPathSet_;
     
-    static bool checkPathIgnored(const fs::path& ignorePath, fs::path::iterator& ignoreIter, const fs::path& currentSubPath);    // Determines if the current path is ignored given the current position (ignoreIter) in ignorePath.
+    static bool checkSubPathIgnored(const fs::path& ignorePath, fs::path::iterator& ignoreIter, const fs::path& currentSubPath);    // Determines if the current sub-path is ignored given the current position (ignoreIter) in ignorePath.
     fs::path substituteRootPath(const fs::path& path);    // Substitute the path root for a match in rootPaths_ if applicable.
     void parseNextLineInFile();    // Read next line in configFile_ (if no more lines, closes the file). Sets writePath_ and readPath_.
 };

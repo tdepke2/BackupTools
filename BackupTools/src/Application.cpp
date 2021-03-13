@@ -91,10 +91,22 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
         }
     }
     
-    for (const auto& writePath : writePathsChecklist) {    // Any remaining paths in the checklist do not belong, mark these for deletion.
-        for (const auto& p : writePath.second) {
-            auto emplaceResult = changes.deletions.emplace(p);
-            assert(emplaceResult.second);
+    for (auto& writePath : writePathsChecklist) {    // Any remaining paths in the checklist (that do not match an ignore) do not belong, mark these for deletion.
+        for (auto setIter = writePath.second.rbegin(); setIter != writePath.second.rend(); ++setIter) {    // Iterate in reverse order to check paths at the leaves of the directory tree first.
+            if (!fileHandler_.checkPathIgnored(*setIter)) {
+                auto emplaceResult = changes.deletions.emplace(*setIter);
+                assert(emplaceResult.second);
+            } else {    // If one of these matches an ignore, it's parent paths are also ignored so they don't get deleted.
+                fs::path ignoredPath = *setIter;
+                std::string ignoredPathStr = ignoredPath.string();
+                for (std::string::size_type lastSeparator = ignoredPathStr.rfind(FileHandler::pathSeparator); lastSeparator != std::string::npos; lastSeparator = ignoredPathStr.rfind(FileHandler::pathSeparator)) {
+                    ignoredPathStr.erase(lastSeparator);
+                    writePath.second.erase(fs::path(ignoredPathStr));
+                }
+                setIter = std::make_reverse_iterator(writePath.second.find(ignoredPath));
+                assert(setIter != writePath.second.rbegin());
+                --setIter;    // Converting to a reverse_iterator advances by 1, undo this.
+            }
         }
     }
     writePathsChecklist.clear();

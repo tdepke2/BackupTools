@@ -16,6 +16,7 @@ root x dest
 #ignore *.txt
 #ignore n
 #ignore beans/a/beans/b/thing.txt
+ignore ignore.txt
 ignore **/beans/a/**/thing.txt
 
 include beef

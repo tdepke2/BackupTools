@@ -7,7 +7,7 @@
 #include <stack>
 #include <stdexcept>
 
-char FileHandler::pathSeparator = std::filesystem::path::preferred_separator;
+char FileHandler::pathSeparator = fs::path::preferred_separator;
 bool FileHandler::globMatchesHiddenFiles = true;
 
 std::ostream& operator<<(std::ostream& out, CSI csiCode) {
@@ -345,7 +345,7 @@ WriteReadPath FileHandler::getNextWriteReadPath() {
         For simplicity, ** only works when by itself in a sub-path.
     For file/directory specific matching, the rules in fnmatchPortable() apply.
 */
-std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pattern) {
+std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pattern) const {
     std::vector<std::pair<fs::path, fs::path>> result;
     
     if (pattern.is_relative()) {    // If pattern is relative, make it absolute.
@@ -407,7 +407,7 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
     
     for (const auto& p : directoryPrefix) {    // Step through directoryPrefix to determine if an ignore matches it.
         for (size_t i = 0; i < ignoreIterStack.top().size(); ++i) {
-            if (checkPathIgnored(ignorePathsCopy[i], ignoreIterStack.top()[i], p)) {
+            if (checkSubPathIgnored(ignorePathsCopy[i], ignoreIterStack.top()[i], p)) {
                 return result;
             }
         }
@@ -449,7 +449,7 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
                     bool includeThisPath = true;    // Check if path (and derived ones) can be ignored.
                     std::vector<fs::path::iterator> ignoreItersNext = ignoreIters;
                     for (size_t i = 0; i < ignoreItersNext.size(); ++i) {
-                        if (checkPathIgnored(ignorePathsCopy[i], ignoreItersNext[i], entry.path().filename())) {
+                        if (checkSubPathIgnored(ignorePathsCopy[i], ignoreItersNext[i], entry.path().filename())) {
                             includeThisPath = false;
                             break;
                         }
@@ -480,7 +480,22 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
     return result;
 }
 
-bool FileHandler::checkPathIgnored(const fs::path& ignorePath, fs::path::iterator& ignoreIter, const fs::path& currentSubPath) {
+bool FileHandler::checkPathIgnored(const fs::path& p) const {
+    for (fs::path ignorePath : ignorePaths_) {    // Step through ignores and path p to determine if there is a match.
+        if (ignorePath.is_relative()) {    // Append a globstar to local paths.
+            ignorePath = "**" / ignorePath;
+        }
+        fs::path::iterator ignorePathIter = ignorePath.begin();
+        for (const auto& subPath : p) {
+            if (checkSubPathIgnored(ignorePath, ignorePathIter, subPath)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool FileHandler::checkSubPathIgnored(const fs::path& ignorePath, fs::path::iterator& ignoreIter, const fs::path& currentSubPath) {
     if (ignoreIter == ignorePath.end()) {    // End iterator means match failed previously.
         return false;
     }
