@@ -369,7 +369,7 @@ WriteReadPath FileHandler::getNextWriteReadPath() {
         For simplicity, ** only works when by itself in a sub-path.
     For file/directory specific matching, the rules in fnmatchPortable() apply.
 */
-std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pattern) const {
+std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pattern) {
     std::vector<std::pair<fs::path, fs::path>> result;
     
     if (pattern.is_relative()) {    // If pattern is relative, make it absolute.
@@ -483,7 +483,9 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
                         //std::cout << "Matched " << entry.path() << "\n";
                         if (addToResult) {
                             fs::path nextPathTraversal = pathTraversal / entry.path().filename();
-                            result.emplace_back(nextPathTraversal, nextPathTraversal.string().substr(dirPrefixOffset));
+                            if (previousReadPaths_.insert(nextPathTraversal).second) {    // Add to result if this read path is unique.
+                                result.emplace_back(nextPathTraversal, nextPathTraversal.string().substr(dirPrefixOffset));
+                            }
                         }
                         if (entry.is_directory()) {
                             pathStack.push(pathTraversal / entry.path().filename());

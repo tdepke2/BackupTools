@@ -41,7 +41,7 @@ void Application::printPaths(const fs::path& configFilename, const bool countOnl
     rootPaths.emplace(nextPath.readAbsolute.root_path());
     while (!nextPath.isEmpty()) {
         if (!readPathsMapping.emplace(nextPath.readAbsolute, nextPath.writePath / nextPath.readLocal).second) {
-            std::cout << CSI::Yellow << "Warn: Skipping duplicate read path: " << nextPath.readAbsolute.string() << CSI::Reset << "\n";
+            std::cout << CSI::Yellow << "Warning: Skipping duplicate read path: " << nextPath.readAbsolute.string() << CSI::Reset << "\n";
         }
         if (longestParentPath != nextPath.readAbsolute.string().substr(0, longestParentPath.size())) {    // Update longestParentPath.
             std::string currentParentPath = nextPath.readAbsolute.string();

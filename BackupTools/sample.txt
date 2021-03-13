@@ -22,6 +22,7 @@ ignore **/beans/a/**/thing.txt
 include beef
 
 in x add source/**
+in dest2 add source/tmp.txt
 
 ignore *.exe
 
