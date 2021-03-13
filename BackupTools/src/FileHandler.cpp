@@ -226,7 +226,7 @@ void FileHandler::skipWhitespace(std::string::size_type& index, const std::strin
     }
 }
 
-std::string FileHandler::parseNextWord(std::string::size_type& index, const std::string& str) {
+std::string parseNextWord_(std::string::size_type& index, const std::string& str) {
     std::string::size_type start = index;
     while (index < str.length()) {
         if (str[index] == ' ') {
@@ -237,7 +237,13 @@ std::string FileHandler::parseNextWord(std::string::size_type& index, const std:
     return str.substr(start);
 }
 
-fs::path FileHandler::parseNextPath(std::string::size_type& index, const std::string& str) {
+std::string FileHandler::parseNextWord(std::string::size_type& index, const std::string& str) {
+    std::string s = parseNextWord_(index, str);
+    skipWhitespace(index, str);
+    return s;
+}
+
+fs::path parseNextPath_(std::string::size_type& index, const std::string& str) {
     std::string::size_type start = index;
     if (index < str.length() && str[index] == '\"') {
         ++index;
@@ -259,7 +265,13 @@ fs::path FileHandler::parseNextPath(std::string::size_type& index, const std::st
     return fs::path(str.substr(start)).lexically_normal();
 }
 
-int FileHandler::parseNextInt(std::string::size_type& index, const std::string& str) {
+fs::path FileHandler::parseNextPath(std::string::size_type& index, const std::string& str) {
+    fs::path p = parseNextPath_(index, str);
+    skipWhitespace(index, str);
+    return p;
+}
+
+int parseNextInt_(std::string::size_type& index, const std::string& str) {
     std::string::size_type start = index;
     while (index < str.length()) {
         if (str[index] == ' ') {
@@ -270,7 +282,13 @@ int FileHandler::parseNextInt(std::string::size_type& index, const std::string& 
     return stoi(str.substr(start));
 }
 
-bool FileHandler::parseNextBool(std::string::size_type& index, const std::string& str) {
+int FileHandler::parseNextInt(std::string::size_type& index, const std::string& str) {
+    int i = parseNextInt_(index, str);
+    skipWhitespace(index, str);
+    return i;
+}
+
+bool parseNextBool_(std::string::size_type& index, const std::string& str) {
     std::string nextWord = "";
     std::string::size_type start = index;
     while (index < str.length() && str[index] != ' ') {
@@ -284,6 +302,12 @@ bool FileHandler::parseNextBool(std::string::size_type& index, const std::string
     } else {
         throw std::runtime_error("Cannot convert argument to bool.");
     }
+}
+
+bool FileHandler::parseNextBool(std::string::size_type& index, const std::string& str) {
+    bool b = parseNextBool_(index, str);
+    skipWhitespace(index, str);
+    return b;
 }
 
 void FileHandler::loadConfigFile(const fs::path& filename) {
@@ -550,7 +574,7 @@ void FileHandler::parseNextLineInFile() {
         if (firstNonSpace != std::string::npos && firstNonSpace != 0) {
             line.erase(0, firstNonSpace);
         }*/
-        std::string::size_type index = 0;    // FIXME: Maybe skipWhitespace() should be included in parse functions. ################################################################
+        std::string::size_type index = 0;
         skipWhitespace(index, line);
         //std::cout << "Line " << lineNumber_ << ": [" << line << "]\n";
         if (index >= line.length() || line[index] == '#') {
@@ -558,13 +582,11 @@ void FileHandler::parseNextLineInFile() {
         }
         
         std::string command = parseNextWord(index, line);
-        skipWhitespace(index, line);
         if (command == "set") {    // Syntax: set <option> <value>
             if (index >= line.length()) {
                 throw std::runtime_error("Missing option parameter.");
             }
             std::string option = parseNextWord(index, line);
-            skipWhitespace(index, line);
             if (option == "match-hidden") {    // Controls matching of hidden files when using wildcard matching.
                 if (index >= line.length()) {
                     throw std::runtime_error("Missing value for \"" + option + "\".");
@@ -578,7 +600,6 @@ void FileHandler::parseNextLineInFile() {
                 throw std::runtime_error("Missing identifier path parameter.");
             }
             fs::path keyPath = parseNextPath(index, line);
-            skipWhitespace(index, line);
             if (index >= line.length()) {
                 throw std::runtime_error("Missing replacement path parameter.");
             }
@@ -592,13 +613,11 @@ void FileHandler::parseNextLineInFile() {
             }
             writePath_ = substituteRootPath(parseNextPath(index, line));
             writePathSet_ = true;
-            skipWhitespace(index, line);
             if (index < line.length()) {
                 command = parseNextWord(index, line);
                 if (command != "add") {
                     throw std::runtime_error("Unexpected command \"" + command + "\" after \"in <write path>\".");
                 }
-                skipWhitespace(index, line);
                 if (index >= line.length()) {
                     throw std::runtime_error("Missing read path parameter.");
                 }
@@ -642,7 +661,6 @@ void FileHandler::parseNextLineInFile() {
         } else {
             throw std::runtime_error("Unknown command \"" + command + "\".");
         }
-        skipWhitespace(index, line);
         if (index < line.length()) {
             throw std::runtime_error("Unexpected data after command.");
         }

@@ -39,18 +39,15 @@ int main(int argc, char** argv) {
                 continue;
             }
             std::string command = FileHandler::parseNextWord(index, line);
-            FileHandler::skipWhitespace(index, line);
             if (command == "backup") {
                 if (index >= line.length()) {
                     throw std::runtime_error("Missing path to config file.");
                 }
                 fs::path configFilename = FileHandler::parseNextPath(index, line);
-                FileHandler::skipWhitespace(index, line);
                 
                 unsigned int outputLimit = 50;    // FIXME: May want to rework this later for less duplicated code. ################################################
                 while (index < line.length()) {
                     command = FileHandler::parseNextWord(index, line);
-                    FileHandler::skipWhitespace(index, line);
                     if (command == "--limit") {
                         if (index >= line.length()) {
                             throw std::runtime_error("Missing value for \"--limit\".");
@@ -65,7 +62,6 @@ int main(int argc, char** argv) {
                         } catch (...) {
                             throw std::runtime_error("Value for \"--limit\" must be integer.");
                         }
-                        FileHandler::skipWhitespace(index, line);
                     } else {
                         throw std::runtime_error("Invalid parameter \"" + command + "\".");
                     }
@@ -78,12 +74,10 @@ int main(int argc, char** argv) {
                     throw std::runtime_error("Missing path to config file.");
                 }
                 fs::path configFilename = FileHandler::parseNextPath(index, line);
-                FileHandler::skipWhitespace(index, line);
                 
                 unsigned int outputLimit = 50;
                 while (index < line.length()) {
                     command = FileHandler::parseNextWord(index, line);
-                    FileHandler::skipWhitespace(index, line);
                     if (command == "--limit") {
                         if (index >= line.length()) {
                             throw std::runtime_error("Missing value for \"--limit\".");
@@ -98,7 +92,6 @@ int main(int argc, char** argv) {
                         } catch (...) {
                             throw std::runtime_error("Value for \"--limit\" must be integer.");
                         }
-                        FileHandler::skipWhitespace(index, line);
                     } else {
                         throw std::runtime_error("Invalid parameter \"" + command + "\".");
                     }
@@ -111,12 +104,10 @@ int main(int argc, char** argv) {
                     throw std::runtime_error("Missing path to config file.");
                 }
                 fs::path configFilename = FileHandler::parseNextPath(index, line);
-                FileHandler::skipWhitespace(index, line);
                 
                 bool countOnly = false;
                 while (index < line.length()) {
                     command = FileHandler::parseNextWord(index, line);
-                    FileHandler::skipWhitespace(index, line);
                     if (command == "--count") {
                         countOnly = true;
                     } else {
