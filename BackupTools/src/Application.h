@@ -3,6 +3,8 @@
 
 #include "FileHandler.h"
 #include <filesystem>
+#include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -38,8 +40,6 @@ class Application {
         
         PrintTreeStats() : numDirectories(0), numFiles(0), numIgnoredDirectories(0), numIgnoredFiles(0) {}
     };
-    
-    FileHandler fileHandler_;
     
     static void printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool countOnly);
     static void printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool printOutput, const std::string& prefix, PrintTreeStats* stats);

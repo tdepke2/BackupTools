@@ -326,6 +326,8 @@ void FileHandler::loadConfigFile(const fs::path& filename) {
     rootPaths_.clear();
     ignorePaths_.clear();
     previousReadPaths_.clear();
+    globPortableResults_.clear();
+    globPortableResultsIndex_ = 0;
     writePath_.clear();
     readPath_.clear();
     writePathSet_ = false;
@@ -334,19 +336,16 @@ void FileHandler::loadConfigFile(const fs::path& filename) {
 
 WriteReadPath FileHandler::getNextWriteReadPath() {
     WriteReadPath result;
-    while (!readPathSet_) {
-        if (!configFile_.is_open()) {
+    while (globPortableResults_.empty()) {
+        if (!configFile_.is_open()) {    // End of file reached, return empty result.
             return result;
         }
-        parseNextLineInFile();
-    }
-    
-    if (globPortableResults_.empty()) {    // If no more results left, grab some more.
-        globPortableResults_ = globPortable(readPath_);
-        globPortableResultsIndex_ = 0;
         
-        if (globPortableResults_.empty()) {    // The readPath_ may not match anything.
-            return result;
+        parseNextLineInFile();
+        if (readPathSet_) {    // If read path encountered, grab more results from globPortable().
+            globPortableResults_ = globPortable(readPath_);
+            globPortableResultsIndex_ = 0;
+            readPathSet_ = false;
         }
     }
     
@@ -356,7 +355,6 @@ WriteReadPath FileHandler::getNextWriteReadPath() {
     ++globPortableResultsIndex_;
     if (globPortableResultsIndex_ >= globPortableResults_.size()) {
         globPortableResults_.clear();
-        readPathSet_ = false;
     }
     
     return result;

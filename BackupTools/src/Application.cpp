@@ -30,9 +30,10 @@ void Application::printPaths(const fs::path& configFilename, const bool countOnl
     std::map<fs::path, fs::path> readPathsMapping;
     std::string longestParentPath;
     std::set<fs::path> rootPaths;
-    fileHandler_.loadConfigFile(configFilename);
+    FileHandler fileHandler;
+    fileHandler.loadConfigFile(configFilename);
     
-    WriteReadPath nextPath = fileHandler_.getNextWriteReadPath();
+    WriteReadPath nextPath = fileHandler.getNextWriteReadPath();
     if (nextPath.isEmpty()) {
         std::cout << "No files or directories found to track.\n";
         return;
@@ -56,7 +57,7 @@ void Application::printPaths(const fs::path& configFilename, const bool countOnl
         }
         rootPaths.emplace(nextPath.readAbsolute.root_path());
         
-        nextPath = fileHandler_.getNextWriteReadPath();
+        nextPath = fileHandler.getNextWriteReadPath();
     }
     
     // Need to modify longestParentPath so that it is a std::map<fs::path, fs::path> for longestParentPath per root directory, and remove rootPaths. ########################################################################
@@ -67,9 +68,10 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     FileChanges changes;
     std::map<fs::path, std::set<fs::path>> writePathsChecklist;    // Maps a destination path to the current contents of that path.
     auto lastWritePathIter = writePathsChecklist.end();
-    fileHandler_.loadConfigFile(configFilename);
+    FileHandler fileHandler;
+    fileHandler.loadConfigFile(configFilename);
     
-    for (WriteReadPath nextPath = fileHandler_.getNextWriteReadPath(); !nextPath.isEmpty(); nextPath = fileHandler_.getNextWriteReadPath()) {
+    for (WriteReadPath nextPath = fileHandler.getNextWriteReadPath(); !nextPath.isEmpty(); nextPath = fileHandler.getNextWriteReadPath()) {
         if (lastWritePathIter == writePathsChecklist.end() || lastWritePathIter->first != nextPath.writePath) {    // Check if the write path changed and add directory contents if it is a new path.
             auto insertResult = writePathsChecklist.emplace(nextPath.writePath, std::set<fs::path>());
             if (insertResult.second) {
@@ -93,7 +95,7 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     
     for (auto& writePath : writePathsChecklist) {    // Any remaining paths in the checklist (that do not match an ignore) do not belong, mark these for deletion.
         for (auto setIter = writePath.second.rbegin(); setIter != writePath.second.rend(); ++setIter) {    // Iterate in reverse order to check paths at the leaves of the directory tree first.
-            if (!fileHandler_.checkPathIgnored(*setIter)) {
+            if (!fileHandler.checkPathIgnored(*setIter)) {
                 auto emplaceResult = changes.deletions.emplace(*setIter);
                 assert(emplaceResult.second);
             } else {    // If one of these matches an ignore, it's parent paths are also ignored so they don't get deleted.
