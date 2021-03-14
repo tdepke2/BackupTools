@@ -657,6 +657,8 @@ void FileHandler::parseNextLineInFile() {
             auto findResult = ignorePaths_.find(includePath);
             if (findResult != ignorePaths_.end()) {
                 ignorePaths_.erase(findResult);
+            } else {
+                throw std::runtime_error("No matching ignore path found for \"" + includePath.string() + "\".");
             }
         } else {
             throw std::runtime_error("Unknown command \"" + command + "\".");

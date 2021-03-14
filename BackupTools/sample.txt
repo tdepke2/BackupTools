@@ -19,8 +19,6 @@ root x dest
 ignore ignore.txt
 ignore **/beans/a/**/thing.txt
 
-include beef
-
 in dest2 add nonexistent.dat
 in x add source/**
 in dest2 add source/tmp.txt

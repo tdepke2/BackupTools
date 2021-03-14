@@ -1,6 +1,5 @@
 Fixes:
     * Output for file errors should be more user friendly.
-    * Warn against missing ignore when using include command.
     * Checking nonexistent path in checkBackup() loop should maybe create the path?
 
 Additions:
