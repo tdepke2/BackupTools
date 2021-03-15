@@ -396,12 +396,15 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
     ++patternIterAhead;
     
     while (patternIterAhead != pattern.end() && !patternIterAhead->empty() && !containsWildcard(patternIter->string().c_str())) {    // Determine the directoryPrefix (the longest path in the pattern without wildcards).
+        fs::file_status s = fs::status(directoryPrefix / *patternIter);
+        if (!fs::exists(s)) {    // Confirm the path does indeed exist and is not a file (otherwise attempt to iterate the file would fail).
+            return result;
+        } else if (fs::is_regular_file(s)) {
+            break;
+        }
         directoryPrefix /= *patternIter;    // The directoryPrefix stops before the last path, ensuring that patternIter points to a non-empty path.
         patternIter = patternIterAhead;
         ++patternIterAhead;
-    }
-    if (!fs::exists(directoryPrefix)) {
-        return result;
     }
     std::string::size_type dirPrefixOffset = directoryPrefix.string().length();    // dirPrefixOffset is the index to trim off the directoryPrefix. If directoryPrefix does not end with a slash, the slash is skipped when taking the substring.
     if (directoryPrefix.has_filename()) {

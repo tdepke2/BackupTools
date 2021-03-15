@@ -27,9 +27,8 @@ bool Application::checkUserConfirmation() {
 }
 
 void Application::printPaths(const fs::path& configFilename, const bool countOnly) {
-    std::map<fs::path, fs::path> readPathsMapping;
-    std::string longestParentPath;
-    std::set<fs::path> rootPaths;
+    std::map<fs::path, fs::path> readPathsMapping;    // Maps read path to corresponding write path.
+    std::map<fs::path, std::string> longestParentPaths;    // Longest common path among nextPath.readAbsolute entries (per root path).
     FileHandler fileHandler;
     fileHandler.loadConfigFile(configFilename);
     
@@ -38,12 +37,16 @@ void Application::printPaths(const fs::path& configFilename, const bool countOnl
         std::cout << "No files or directories found to track.\n";
         return;
     }
-    longestParentPath = nextPath.readAbsolute.string();
-    rootPaths.emplace(nextPath.readAbsolute.root_path());
+    
     while (!nextPath.isEmpty()) {
         if (!readPathsMapping.emplace(nextPath.readAbsolute, nextPath.writePath / nextPath.readLocal).second) {
             std::cout << CSI::Yellow << "Warning: Skipping duplicate read path: " << nextPath.readAbsolute.string() << CSI::Reset << "\n";
         }
+        auto findResult = longestParentPaths.find(nextPath.readAbsolute.root_path());
+        if (findResult == longestParentPaths.end()) {    // New root encountered, add entry for it.
+            findResult = longestParentPaths.emplace(nextPath.readAbsolute.root_path(), nextPath.readAbsolute.string()).first;
+        }
+        std::string& longestParentPath = findResult->second;
         if (longestParentPath != nextPath.readAbsolute.string().substr(0, longestParentPath.size())) {    // Update longestParentPath.
             std::string currentParentPath = nextPath.readAbsolute.string();
             for (size_t i = 0; i < longestParentPath.size(); ++i) {
@@ -55,13 +58,16 @@ void Application::printPaths(const fs::path& configFilename, const bool countOnl
                 }
             }
         }
-        rootPaths.emplace(nextPath.readAbsolute.root_path());
         
         nextPath = fileHandler.getNextWriteReadPath();
     }
     
-    // Need to modify longestParentPath so that it is a std::map<fs::path, fs::path> for longestParentPath per root directory, and remove rootPaths. ########################################################################
-    printTree(longestParentPath, readPathsMapping, countOnly);
+    for (auto mapIter = longestParentPaths.begin(); mapIter != longestParentPaths.end(); ++mapIter) {
+        if (mapIter != longestParentPaths.begin()) {
+            std::cout << "\n";
+        }
+        printTree(mapIter->second, readPathsMapping, countOnly);
+    }
 }
 
 Application::FileChanges Application::checkBackup(const fs::path& configFilename, size_t outputLimit, bool displayConfirmation, bool silent) {
