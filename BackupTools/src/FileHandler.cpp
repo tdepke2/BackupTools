@@ -373,10 +373,8 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
     if (pattern.is_relative()) {    // If pattern is relative, make it absolute.
         pattern = (fs::current_path() / pattern).lexically_normal();
     }
-    bool addedTrailingGlobstar = false;
     if (!containsWildcard(pattern.filename().string().c_str())) {    // If last sub-path is not a glob, assume it is a directory and match contents recursively.
         pattern /= "**";
-        addedTrailingGlobstar = true;
     }
     
     auto patternIter = pattern.begin();
@@ -386,28 +384,29 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
             return result;
         }
     }
-    ++patternIter;    // Skip root directory.
-    if (patternIter == pattern.end()) {
-        return result;
+    if (pattern.has_root_directory()) {    // Skip root directory.
+        ++patternIter;
+        if (patternIter == pattern.end()) {
+            return result;
+        }
     }
     
     fs::path directoryPrefix = pattern.root_path();
-    auto patternIter2 = patternIter;
-    ++patternIter2;
+    auto patternIterAhead = patternIter;
+    ++patternIterAhead;
     
-    while (patternIter2 != pattern.end() && !containsWildcard(patternIter2->string().c_str())) {    // Determine the directoryPrefix (the longest path in the pattern without wildcards).
-        directoryPrefix /= *patternIter;
-        patternIter = patternIter2;
-        ++patternIter2;
-    }
-    if (!addedTrailingGlobstar) {
-        directoryPrefix /= *patternIter;
-        ++patternIter;
+    while (patternIterAhead != pattern.end() && !patternIterAhead->empty() && !containsWildcard(patternIter->string().c_str())) {    // Determine the directoryPrefix (the longest path in the pattern without wildcards).
+        directoryPrefix /= *patternIter;    // The directoryPrefix stops before the last path, ensuring that patternIter points to a non-empty path.
+        patternIter = patternIterAhead;
+        ++patternIterAhead;
     }
     if (!fs::exists(directoryPrefix)) {
         return result;
     }
-    std::string::size_type dirPrefixOffset = directoryPrefix.string().length() + 1;
+    std::string::size_type dirPrefixOffset = directoryPrefix.string().length();    // dirPrefixOffset is the index to trim off the directoryPrefix. If directoryPrefix does not end with a slash, the slash is skipped when taking the substring.
+    if (directoryPrefix.has_filename()) {
+        ++dirPrefixOffset;
+    }
     
     std::stack<fs::path> pathStack;    // Stacks for recursive directory matching process.
     pathStack.push(directoryPrefix);
