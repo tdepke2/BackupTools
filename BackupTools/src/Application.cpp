@@ -66,7 +66,11 @@ void Application::printPaths(const fs::path& configFilename, const bool countOnl
         if (mapIter != longestParentPaths.begin()) {
             std::cout << "\n";
         }
-        printTree(mapIter->second, readPathsMapping, countOnly);
+        if (fs::is_regular_file(mapIter->second) && mapIter->second.rfind(FileHandler::pathSeparator) != std::string::npos) {    // If parent path is a file, cut off the file portion before call to printTree().
+            printTree(mapIter->second.substr(0, mapIter->second.rfind(FileHandler::pathSeparator) + 1), readPathsMapping, countOnly);
+        } else {
+            printTree(mapIter->second, readPathsMapping, countOnly);
+        }
     }
 }
 
