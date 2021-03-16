@@ -373,8 +373,10 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
     if (pattern.is_relative()) {    // If pattern is relative, make it absolute.
         pattern = (fs::current_path() / pattern).lexically_normal();
     }
+    bool addedTrailingGlobstar = false;
     if (!containsWildcard(pattern.filename().string().c_str())) {    // If last sub-path is not a glob, assume it is a directory and match contents recursively.
         pattern /= "**";
+        addedTrailingGlobstar = true;
     }
     
     auto patternIter = pattern.begin();
@@ -399,7 +401,7 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
         fs::file_status s = fs::status(directoryPrefix / *patternIter);
         if (!fs::exists(s)) {    // Confirm the path does indeed exist and is not a file (otherwise attempt to iterate the file would fail).
             return result;
-        } else if (fs::is_regular_file(s)) {
+        } else if (fs::is_regular_file(s) || (addedTrailingGlobstar && containsWildcard(patternIterAhead->string().c_str()))) {    // If a globstar was appended, stop before the last directory so that it will be included in write paths.
             break;
         }
         directoryPrefix /= *patternIter;    // The directoryPrefix stops before the last path, ensuring that patternIter points to a non-empty path.
