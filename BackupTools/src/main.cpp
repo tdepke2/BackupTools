@@ -130,6 +130,12 @@ int main(int argc, char** argv) {
             } else {
                 throw std::runtime_error("Unknown command \"" + command + "\". Type \"help\" for command list.");
             }
+        } catch (fs::filesystem_error& ex) {
+            std::cout << CSI::Red << "Error: " << ex.code().message() << ": \"" << ex.path1().string() << "\"";
+            if (!ex.path2().empty()) {
+                std::cout << ", \"" << ex.path2().string() << "\"";
+            }
+            std::cout << CSI::Reset << "\n";
         } catch (std::exception& ex) {
             std::cout << CSI::Red << "Error: " << ex.what() << CSI::Reset << "\n";
         }

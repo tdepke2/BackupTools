@@ -498,7 +498,13 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
                     }
                 }
             }
-        } catch (std::exception& ex) {    // Exception accessing path can be ignored (treat it like an empty directory).
+        } catch (fs::filesystem_error& ex) {    // Exception accessing path can be ignored (treat it like an empty directory).
+            std::cout << CSI::Red << "Error: " << ex.code().message() << ": \"" << ex.path1().string() << "\"";
+            if (!ex.path2().empty()) {
+                std::cout << ", \"" << ex.path2().string() << "\"";
+            }
+            std::cout << CSI::Reset << "\n";
+        } catch (std::exception& ex) {
             std::cout << CSI::Red << "Error: " << ex.what() << CSI::Reset << "\n";
         }
         

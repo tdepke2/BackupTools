@@ -290,6 +290,15 @@ void Application::printTree2(const fs::path& searchPath, const std::map<fs::path
         for (const auto& entry : fs::directory_iterator(searchPath)) {
             searchContents.emplace_back(entry);
         }
+    } catch (fs::filesystem_error& ex) {
+        if (printOutput) {
+            std::cout << CSI::Red << "Error: " << ex.code().message() << ": \"" << ex.path1().string() << "\"";
+            if (!ex.path2().empty()) {
+                std::cout << ", \"" << ex.path2().string() << "\"";
+            }
+            std::cout << CSI::Reset << "\n";
+        }
+        return;
     } catch (std::exception& ex) {
         if (printOutput) {
             std::cout << prefix << CSI::Red << "Error: " << ex.what() << CSI::Reset << "\n";

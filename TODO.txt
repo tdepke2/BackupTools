@@ -1,5 +1,4 @@
 Fixes:
-    * Output for file errors should be more user friendly.
     * Checking nonexistent path in checkBackup() loop should maybe create the path? (but that won't work for nonexistent drives)
 
 Additions:
