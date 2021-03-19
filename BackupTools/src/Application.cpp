@@ -125,11 +125,16 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     
     optimizeForRenames(changes);
     
-    if (silent) {
-        return changes;
-    } else if (changes.isEmpty()) {
+    if (!silent) {
+        printChanges(changes, outputLimit, displayConfirmation);
+    }
+    return changes;
+}
+
+void Application::printChanges(const FileChanges& changes, size_t outputLimit, bool displayConfirmation) {
+    if (changes.isEmpty()) {
         std::cout << "All up to date.\n";
-        return changes;
+        return;
     }
     
     if (!changes.deletions.empty()) {
@@ -217,7 +222,6 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
             std::cout << std::setw(5) << changes.renames.size() << " item(s) to rename.\n";
         }
     }
-    return changes;
 }
 
 void Application::startBackup(const fs::path& configFilename, size_t outputLimit, bool forceBackup) {
@@ -263,8 +267,53 @@ void Application::startBackup(const fs::path& configFilename, size_t outputLimit
     }
 }
 
-void Application::restoreFromBackup(const fs::path& configFilename) {
+void Application::restoreFromBackup(const fs::path& configFilename, size_t outputLimit, bool forceRestore) {
+    FileChanges changes = checkBackup(configFilename, outputLimit, true, true);
+    reverseChanges(changes);
     
+    if (!forceRestore) {
+        printChanges(changes, outputLimit, true);
+    }
+    
+    if (changes.isEmpty()) {
+        return;
+    }
+    if (!forceRestore && !checkUserConfirmation()) {
+        std::cout << "Restore canceled.\n";
+        return;
+    }
+    
+    for (const auto& p : changes.additions) {
+        std::cout << "Adding " << p.second.string() << "\n";
+        if (fs::is_directory(p.first)) {
+            //fs::create_directory(p.second);
+        } else {
+            //fs::copy(p.first, p.second);
+        }
+    }
+    
+    for (const auto& p : changes.renames) {    // Renaming must happen after additions and before removals so that there are no missing directory conflicts.
+        std::cout << "Renaming " << p.first.string() << "\n";
+        //fs::rename(p.first, p.second);
+    }
+    
+    for (auto setIter = changes.deletions.rbegin(); setIter != changes.deletions.rend(); ++setIter) {    // Iterate through deletions in reverse to avoid using recursive delete function.
+        std::cout << "Removing " << setIter->string() << "\n";
+        //fs::remove(*setIter);
+    }
+    
+    for (const auto& p : changes.modifications) {
+        std::cout << "Replacing " << p.second.string() << "\n";
+        //fs::copy(p.first, p.second, fs::copy_options::overwrite_existing);
+    }
+    
+    if (!forceRestore) {
+        FileChanges changesAfter = checkBackup(configFilename, outputLimit, true, true);
+        if (!changesAfter.isEmpty()) {
+            std::cout << "\n" << CSI::Yellow << "Warning: Found remaining changes after running restore. This may have been caused by an error during\n";
+            std::cout << "file operations or recursive rules in the config file. Run \"check <config file>\" for more details." << CSI::Reset << "\n";
+        }
+    }
 }
 
 void Application::printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool countOnly) {
@@ -378,4 +427,28 @@ void Application::optimizeForRenames(FileChanges& changes) {
             ++additionsIter;
         }
     }
+}
+
+void Application::reverseChanges(FileChanges& changes) {
+    std::set<fs::path, decltype(&compareFilename)> tempDeletions(&compareFilename);    // Swap deletions and additions.
+    for (const auto& addEntry : changes.additions) {
+        tempDeletions.emplace(addEntry.first);
+    }
+    changes.additions.clear();
+    for (const auto& deleteEntry : changes.deletions) {
+        changes.additions.emplace(deleteEntry, "");
+    }
+    changes.deletions = std::move(tempDeletions);
+    
+    std::set<std::pair<fs::path, fs::path>, decltype(&compareFileChange)> tempModifications(&compareFileChange);    // Swap paths in modifications.
+    for (const auto& modifyEntry : changes.modifications) {
+        tempModifications.emplace(modifyEntry.second, modifyEntry.first);
+    }
+    changes.modifications = std::move(tempModifications);
+    
+    std::set<std::pair<fs::path, fs::path>, decltype(&compareFileChange)> tempRenames(&compareFileChange);    // Swap paths in renames.
+    for (const auto& renameEntry : changes.renames) {
+        tempRenames.emplace(renameEntry.second, renameEntry.first);
+    }
+    changes.renames = std::move(tempRenames);
 }

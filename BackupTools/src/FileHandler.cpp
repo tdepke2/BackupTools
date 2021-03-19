@@ -360,6 +360,17 @@ WriteReadPath FileHandler::getNextWriteReadPath() {
     return result;
 }
 
+WriteReadPath FileHandler::getNextWriteReadPathReversed() {
+    WriteReadPath result = getNextWriteReadPath();
+    if (result.isEmpty()) {
+        return result;
+    }
+    std::string tempReadAbsoluteStr = result.readAbsolute.string();
+    result.readAbsolute = result.writePath / result.readLocal;
+    result.writePath = tempReadAbsoluteStr.substr(0, tempReadAbsoluteStr.length() - result.readLocal.string().length() - 1);
+    return result;
+}
+
 /** Globbing details:
     If last directory name does not contain wildcards, the directory is matched recursively (and all files stem from the directory name).
     * will match any one file or directory name.

@@ -1,5 +1,9 @@
 Fixes:
     * Checking nonexistent path in checkBackup() loop should maybe create the path? (but that won't work for nonexistent drives)
+    * Comments could use some work, maybe try doxygen standard?
 
 Additions:
     * Catch SIGINT to gracefully stop.
+    * Need a better CLI string parser.
+    * Running backup should display a progress bar instead of just outputting each operation.
+    * More CLI flags need to be added (--force for example).

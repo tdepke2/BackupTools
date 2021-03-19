@@ -118,11 +118,35 @@ int main(int argc, char** argv) {
                 Application app;
                 app.printPaths(configFilename, countOnly);
             } else if (command == "restore") {
-                
-                
-                if (index < line.length()) {
-                    throw std::runtime_error("Invalid parameter(s) \"" + line.substr(index) + "\".");
+                if (index >= line.length()) {
+                    throw std::runtime_error("Missing path to config file.");
                 }
+                fs::path configFilename = FileHandler::parseNextPath(index, line);
+                
+                unsigned int outputLimit = 50;
+                while (index < line.length()) {
+                    command = FileHandler::parseNextWord(index, line);
+                    if (command == "--limit") {
+                        if (index >= line.length()) {
+                            throw std::runtime_error("Missing value for \"--limit\".");
+                        }
+                        try {
+                            int n = FileHandler::parseNextInt(index, line);
+                            if (n < 0) {
+                                outputLimit = std::numeric_limits<unsigned int>::max();
+                            } else {
+                                outputLimit = static_cast<unsigned int>(n);
+                            }
+                        } catch (...) {
+                            throw std::runtime_error("Value for \"--limit\" must be integer.");
+                        }
+                    } else {
+                        throw std::runtime_error("Invalid parameter \"" + command + "\".");
+                    }
+                }
+                
+                Application app;
+                app.restoreFromBackup(configFilename, outputLimit, false);
             } else if (command == "help") {
                 showHelp();
             } else if (command == "exit") {

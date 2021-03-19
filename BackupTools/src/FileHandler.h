@@ -60,6 +60,7 @@ class FileHandler {
     
     void loadConfigFile(const fs::path& filename);
     WriteReadPath getNextWriteReadPath();    // Get the next write/read combination from configFile_, or return empty paths if none left. Returned paths are stripped of regex and read path is unique and not contained in ignorePaths_.
+    WriteReadPath getNextWriteReadPathReversed();
     std::vector<std::pair<fs::path, fs::path>> globPortable(fs::path pattern);    // Returns a list of absolute/local paths that match the pattern. The pattern must be in normal form.
     bool checkPathIgnored(const fs::path& p) const;    // Iterates through all of ignorePaths_ and determines if there is a match. The complexity is O(N*M) so use carefully.
     

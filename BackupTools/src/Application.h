@@ -28,8 +28,9 @@ class Application {
     static bool checkUserConfirmation();    // Gets user input and returns true only if any variant of "yes" was entered.
     void printPaths(const fs::path& configFilename, const bool countOnly);
     FileChanges checkBackup(const fs::path& configFilename, size_t outputLimit, bool displayConfirmation = false, bool silent = false);
+    void printChanges(const FileChanges& changes, size_t outputLimit, bool displayConfirmation = false);
     void startBackup(const fs::path& configFilename, size_t outputLimit, bool forceBackup);
-    void restoreFromBackup(const fs::path& configFilename);
+    void restoreFromBackup(const fs::path& configFilename, size_t outputLimit, bool forceRestore);
     
     private:
     struct PrintTreeStats {
@@ -44,6 +45,7 @@ class Application {
     static void printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool countOnly);
     static void printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool printOutput, const std::string& prefix, PrintTreeStats* stats);
     static void optimizeForRenames(FileChanges& changes);    // Modifies changes so that files that are equivalent and have different paths are removed from changes.deletions/changes.additions and added to changes.renames.
+    static void reverseChanges(FileChanges& changes);    // Modifies changes so that deletions and additions swap, and modifications and renames are flipped (used in finding the restore changes).
 };
 
 #endif
