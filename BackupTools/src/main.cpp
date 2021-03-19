@@ -14,13 +14,12 @@ namespace fs = std::filesystem;
 
 void showHelp() {
     std::cout << "Options:\n";
-    std::cout << "  backup <config file> [--limit n]    Starts a backup.\n";
+    std::cout << "  backup <config file> [--limit n]    Starts a backup/restore of files.\n";
     std::cout << "    --limit n                           Limits output to n lines (50 by default). Use -1 for no limit.\n";
-    std::cout << "  check <config file> [--limit n]     Checks backup status.\n";
+    std::cout << "  check <config file> [--limit n]     Lists changes to make during backup.\n";
     std::cout << "    --limit n                           Limits output to n lines (50 by default). Use -1 for no limit.\n";
     std::cout << "  tree <config file> [--count]        Displays tree of tracked files.\n";
     std::cout << "    --count                             Only display the total count.\n";
-    std::cout << "  restore <config file>               Restores a backup.\n";
     std::cout << "  help                                Shows this menu.\n";
     std::cout << "  exit                                Exits interactive shell.\n";
 }
@@ -117,36 +116,6 @@ int main(int argc, char** argv) {
                 
                 Application app;
                 app.printPaths(configFilename, countOnly);
-            } else if (command == "restore") {
-                if (index >= line.length()) {
-                    throw std::runtime_error("Missing path to config file.");
-                }
-                fs::path configFilename = FileHandler::parseNextPath(index, line);
-                
-                unsigned int outputLimit = 50;
-                while (index < line.length()) {
-                    command = FileHandler::parseNextWord(index, line);
-                    if (command == "--limit") {
-                        if (index >= line.length()) {
-                            throw std::runtime_error("Missing value for \"--limit\".");
-                        }
-                        try {
-                            int n = FileHandler::parseNextInt(index, line);
-                            if (n < 0) {
-                                outputLimit = std::numeric_limits<unsigned int>::max();
-                            } else {
-                                outputLimit = static_cast<unsigned int>(n);
-                            }
-                        } catch (...) {
-                            throw std::runtime_error("Value for \"--limit\" must be integer.");
-                        }
-                    } else {
-                        throw std::runtime_error("Invalid parameter \"" + command + "\".");
-                    }
-                }
-                
-                Application app;
-                app.restoreFromBackup(configFilename, outputLimit, false);
             } else if (command == "help") {
                 showHelp();
             } else if (command == "exit") {
