@@ -16,9 +16,11 @@ void showHelp() {
     std::cout << "Options:\n";
     std::cout << "  backup <config file> [--limit n]    Starts a backup/restore of files.\n";
     std::cout << "    --limit n                           Limits output to n lines (50 by default). Use -1 for no limit.\n";
+    std::cout << "    --force                             Forces backup to run without confirmation check.\n";
     std::cout << "  check <config file> [--limit n]     Lists changes to make during backup.\n";
     std::cout << "    --limit n                           Limits output to n lines (50 by default). Use -1 for no limit.\n";
     std::cout << "  tree <config file> [--count]        Displays tree of tracked files.\n";
+    std::cout << "    --verbose                           Show tracked file destinations.\n";
     std::cout << "    --count                             Only display the total count.\n";
     std::cout << "  help                                Shows this menu.\n";
     std::cout << "  exit                                Exits interactive shell.\n";
@@ -45,6 +47,7 @@ int main(int argc, char** argv) {
                 fs::path configFilename = FileHandler::parseNextPath(index, line);
                 
                 unsigned int outputLimit = 50;    // FIXME: May want to rework this later for less duplicated code. ################################################
+                bool forceBackup = false;
                 while (index < line.length()) {
                     command = FileHandler::parseNextWord(index, line);
                     if (command == "--limit") {
@@ -61,13 +64,15 @@ int main(int argc, char** argv) {
                         } catch (...) {
                             throw std::runtime_error("Value for \"--limit\" must be integer.");
                         }
+                    } else if (command == "--force") {
+                        forceBackup = true;
                     } else {
                         throw std::runtime_error("Invalid parameter \"" + command + "\".");
                     }
                 }
                 
                 Application app;
-                app.startBackup(configFilename, outputLimit, false);
+                app.startBackup(configFilename, outputLimit, forceBackup);
             } else if (command == "check") {
                 if (index >= line.length()) {
                     throw std::runtime_error("Missing path to config file.");
@@ -104,10 +109,13 @@ int main(int argc, char** argv) {
                 }
                 fs::path configFilename = FileHandler::parseNextPath(index, line);
                 
+                bool verbose = false;
                 bool countOnly = false;
                 while (index < line.length()) {
                     command = FileHandler::parseNextWord(index, line);
-                    if (command == "--count") {
+                    if (command == "--verbose") {
+                        verbose = true;
+                    } else if (command == "--count") {
                         countOnly = true;
                     } else {
                         throw std::runtime_error("Invalid parameter \"" + command + "\".");
@@ -115,7 +123,7 @@ int main(int argc, char** argv) {
                 }
                 
                 Application app;
-                app.printPaths(configFilename, countOnly);
+                app.printPaths(configFilename, verbose, countOnly);
             } else if (command == "help") {
                 showHelp();
             } else if (command == "exit") {

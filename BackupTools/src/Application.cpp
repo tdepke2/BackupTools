@@ -27,7 +27,7 @@ bool Application::checkUserConfirmation() {
     return acceptInputs.count(inputCleaned) > 0;
 }
 
-void Application::printPaths(const fs::path& configFilename, const bool countOnly) {
+void Application::printPaths(const fs::path& configFilename, bool verbose, bool countOnly) {
     std::map<fs::path, fs::path> readPathsMapping;    // Maps read path to corresponding write path.
     std::map<fs::path, std::string> longestParentPaths;    // Longest common path among nextPath.readAbsolute entries (per root path).
     FileHandler fileHandler;
@@ -74,9 +74,9 @@ void Application::printPaths(const fs::path& configFilename, const bool countOnl
             std::cout << "\n";
         }
         if (fs::is_regular_file(mapIter->second) && mapIter->second.rfind(FileHandler::pathSeparator) != std::string::npos) {    // If parent path is a file, cut off the file portion before call to printTree().
-            printTree(mapIter->second.substr(0, mapIter->second.rfind(FileHandler::pathSeparator) + 1), readPathsMapping, countOnly);
+            printTree(mapIter->second.substr(0, mapIter->second.rfind(FileHandler::pathSeparator) + 1), readPathsMapping, verbose, countOnly);
         } else {
-            printTree(mapIter->second, readPathsMapping, countOnly);
+            printTree(mapIter->second, readPathsMapping, verbose, countOnly);
         }
     }
 }
@@ -293,14 +293,14 @@ void Application::startBackup(const fs::path& configFilename, size_t outputLimit
     }
 }
 
-void Application::printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool countOnly) {
+void Application::printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, bool verbose, bool countOnly) {
     fs::file_status searchPathStatus = fs::status(searchPath);
     if (!fs::exists(searchPathStatus)) {
         throw std::runtime_error("\"" + searchPath.string() + "\": Unable to find path.");
     } else if (fs::is_directory(searchPathStatus)) {
         std::cout << CSI::Cyan << searchPath.string() << CSI::Reset << "\n";
         PrintTreeStats stats;
-        printTree2(searchPath, readPathsMapping, !countOnly, "", &stats);
+        printTree2(searchPath, readPathsMapping, verbose, !countOnly, "", &stats);
         
         std::cout << "\n" << stats.numDirectories << " directories, " << stats.numFiles << " files\n";
         std::cout << stats.numIgnoredDirectories << " ignored directories, " << stats.numIgnoredFiles << " ignored files\n";
@@ -309,7 +309,7 @@ void Application::printTree(const fs::path& searchPath, const std::map<fs::path,
     }
 }
 
-void Application::printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, const bool printOutput, const std::string& prefix, PrintTreeStats* stats) {
+void Application::printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, bool verbose, bool printOutput, const std::string& prefix, PrintTreeStats* stats) {
     std::vector<fs::directory_entry> searchContents;
     //std::priority_queue<fs::directory_entry, std::vector<fs::directory_entry>, decltype(&compareFilename)> searchContents(&compareFilename);    // Tested priority queue optimization, but turned out to be about 1.5 times slower.
     try {
@@ -331,9 +331,9 @@ void Application::printTree2(const fs::path& searchPath, const std::map<fs::path
         }
         return;
     }
-    if (searchContents.empty()) {
+    if (searchContents.empty()) {    // Current directory is empty.
         auto findResult = readPathsMapping.find(searchPath);
-        if (printOutput && findResult != readPathsMapping.end()) {
+        if (verbose && printOutput && findResult != readPathsMapping.end()) {
             std::cout << prefix << " -> " << findResult->second.string() << "\n";
         }
         return;
@@ -356,14 +356,14 @@ void Application::printTree2(const fs::path& searchPath, const std::map<fs::path
             if (!isTracked) {
                 ++stats->numIgnoredDirectories;
             }
-            printTree2(searchContents[i].path(), readPathsMapping, printOutput, prefix + (isLast ? "    " : "|   "), stats);
+            printTree2(searchContents[i].path(), readPathsMapping, verbose, printOutput, prefix + (isLast ? "    " : "|   "), stats);
         } else {
             ++stats->numFiles;
             if (printOutput) {
                 std::cout << (isLast ? "\'-- " : "|-- ") << (isTracked ? CSI::Green : CSI::Yellow) << searchContents[i].path().filename().string() << CSI::Reset << "\n";
             }
             if (isTracked) {
-                if (printOutput) {
+                if (verbose && printOutput) {
                     std::cout << prefix << (isLast ? "    " : "|   ") << " -> " << findResult->second.string() << "\n";
                 }
             } else {
