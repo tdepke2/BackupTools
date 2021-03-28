@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cctype>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -32,9 +33,13 @@ void Application::printPaths(const fs::path& configFilename, const bool countOnl
     FileHandler fileHandler;
     fileHandler.loadConfigFile(configFilename);
     
+    int spinnerIndex = 0;
+    std::chrono::steady_clock::time_point spinnerLastTime = std::chrono::steady_clock::now();
+    std::cout << "Scanning directory structure...\n";
+    
     WriteReadPath nextPath = fileHandler.getNextWriteReadPath();
     if (nextPath.isEmpty()) {
-        std::cout << "No files or directories found to track.\n";
+        std::cout << "\nNo files or directories found to track.\n";
         return;
     }
     
@@ -60,7 +65,9 @@ void Application::printPaths(const fs::path& configFilename, const bool countOnl
         }
         
         nextPath = fileHandler.getNextWriteReadPath();
+        printSpinner(spinnerIndex, spinnerLastTime);
     }
+    std::cout << " \n";    // Clear spinner.
     
     for (auto mapIter = longestParentPaths.begin(); mapIter != longestParentPaths.end(); ++mapIter) {
         if (mapIter != longestParentPaths.begin()) {
@@ -80,6 +87,10 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     auto lastWritePathIter = writePathsChecklist.end();
     FileHandler fileHandler;
     fileHandler.loadConfigFile(configFilename);
+    
+    int spinnerIndex = 0;
+    std::chrono::steady_clock::time_point spinnerLastTime = std::chrono::steady_clock::now();
+    std::cout << "Scanning for changes...\n";    // FIXME(TGD): Should this (and print spinner) not print if silent is true?
     
     for (WriteReadPath nextPath = fileHandler.getNextWriteReadPath(); !nextPath.isEmpty(); nextPath = fileHandler.getNextWriteReadPath()) {
         if (lastWritePathIter == writePathsChecklist.end() || lastWritePathIter->first != nextPath.writePath) {    // Check if the write path changed and add directory contents if it is a new path.
@@ -101,6 +112,7 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
             auto emplaceResult = changes.modifications.emplace(nextPath.readAbsolute, destinationPath);
             assert(emplaceResult.second);
         }
+        printSpinner(spinnerIndex, spinnerLastTime);
     }
     
     for (auto& writePath : writePathsChecklist) {    // Any remaining paths in the checklist (that do not match an ignore) do not belong, mark these for deletion.
@@ -120,11 +132,13 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
                 --setIter;    // Converting to a reverse_iterator advances by 1, undo this.
             }
         }
+        printSpinner(spinnerIndex, spinnerLastTime);
     }
     writePathsChecklist.clear();
     
     optimizeForRenames(changes);
     
+    std::cout << " \n";    // Clear spinner.
     if (!silent) {
         printChanges(changes, outputLimit, displayConfirmation);
     }
@@ -207,7 +221,7 @@ void Application::printChanges(const FileChanges& changes, size_t outputLimit, b
         if (!changes.renames.empty()) {
             std::cout << std::setw(5) << changes.renames.size() << " item(s) will be renamed.\n";
         }
-        std::cout << "\nAre you sure? [Y/N] ";
+        std::cout << "\nDo you want to continue [Y/n]? ";
     } else {
         if (!changes.deletions.empty()) {
             std::cout << std::setw(5) << changes.deletions.size() << " item(s) to remove.\n";
@@ -230,32 +244,44 @@ void Application::startBackup(const fs::path& configFilename, size_t outputLimit
         return;
     }
     if (!forceBackup && !checkUserConfirmation()) {
-        std::cout << "Backup canceled.\n";
+        std::cout << "\nBackup canceled.\n";
         return;
     }
     
+    double numOperations = static_cast<double>(changes.getCount());
+    size_t currOperation = 1;
+    std::cout << "\n\n\n";    // Go down 3 lines (1 for spacing, 2 for printProgressBar() alignment).
+    
     for (const auto& p : changes.additions) {
+        printProgressBar(currOperation / numOperations);
         std::cout << "Adding " << p.second.string() << "\n";
         if (fs::is_directory(p.first)) {
             fs::create_directory(p.second);
         } else {
             fs::copy(p.first, p.second);
         }
+        ++currOperation;
     }
     
     for (const auto& p : changes.renames) {    // Renaming must happen after additions and before removals so that there are no missing directory conflicts.
+        printProgressBar(currOperation / numOperations);
         std::cout << "Renaming " << p.first.string() << "\n";
         fs::rename(p.first, p.second);
+        ++currOperation;
     }
     
     for (auto setIter = changes.deletions.rbegin(); setIter != changes.deletions.rend(); ++setIter) {    // Iterate through deletions in reverse to avoid using recursive delete function.
+        printProgressBar(currOperation / numOperations);
         std::cout << "Removing " << setIter->string() << "\n";
         fs::remove(*setIter);
+        ++currOperation;
     }
     
     for (const auto& p : changes.modifications) {
+        printProgressBar(currOperation / numOperations);
         std::cout << "Replacing " << p.second.string() << "\n";
         fs::copy(p.first, p.second, fs::copy_options::overwrite_existing);
+        ++currOperation;
     }
     
     if (!forceBackup) {
@@ -378,4 +404,27 @@ void Application::optimizeForRenames(FileChanges& changes) {
             ++additionsIter;
         }
     }
+}
+
+void Application::printSpinner(int& index, std::chrono::steady_clock::time_point& lastTime) {
+    constexpr char spinnerStr[] = "|/-\\";
+    std::chrono::steady_clock::time_point currTime = std::chrono::steady_clock::now();
+    
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(currTime - lastTime).count() > 200) {
+        index = (index + 1) % 4;
+        std::cout << spinnerStr[index];
+        std::cout << "\033[1D";    // Move cursor back 1.
+        lastTime = currTime;
+    }
+}
+
+void Application::printProgressBar(double progress) {
+    constexpr int MAX_BAR_SIZE = 40;
+    
+    std::string percent = std::to_string(std::lround(progress * 100.0)) + "%";
+    int barLength = std::lround(progress * MAX_BAR_SIZE);
+    std::cout << "\033[2A";    // Move cursor up by 2.
+    std::cout << std::left << std::setw(4) << percent << std::right << '[' << std::setfill('=') << std::setw(barLength) << '>' << std::setfill(' ') << std::setw(MAX_BAR_SIZE - barLength + (barLength > 0 ? 1 : 0)) << ']' << '\n';
+    std::cout << "\033[2K";    // Clear line.
+    // The message line should be outputted next followed by a newline.
 }
