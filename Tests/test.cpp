@@ -1,5 +1,6 @@
 // Note: need to define /Zc:__cplusplus to get this to compile with VS2017 using c++17
 #include "pch.h"
+#include "../BackupTools/src/ArgumentParser.h"
 #include "../BackupTools/src/FileHandler.h"
 
 // ****************************************************************************
@@ -531,4 +532,119 @@ TEST(TestContainsWildcard, Test1) {
     EXPECT_EQ(FileHandler::containsWildcard("`~1!2@3#4$5%6^7&89(0)-_=+{}\\|;:\'\",<.>/"), false);
     EXPECT_EQ(FileHandler::containsWildcard("C:\\path\\to\\file.txt"), false);
     EXPECT_EQ(FileHandler::containsWildcard("C:\\path\\to\\*.txt"), true);
+}
+
+// ****************************************************************************
+// * TestArgumentParser                                                     *
+// ****************************************************************************
+
+TEST(TestArgumentParser, Test1) {
+    ArgumentParser::OptionList options = {
+        {'a', "add", ArgumentParser::RequiredArg, nullptr, 'a'},
+        {'b', "", ArgumentParser::NoArg, nullptr, 'b'},
+        {'\0', "thing", ArgumentParser::OptionalArg, nullptr, 't'}
+    };
+    ArgumentParser argParser(options);
+    
+    {
+        const char* argv[] = {
+            "hello",
+            "test",
+            nullptr
+        };
+        argParser.setArguments(argv, 0);
+        
+        EXPECT_EQ(argParser.nextOption(), -1);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 0);
+        
+        EXPECT_TRUE(std::strcmp(argv[0], "hello") == 0);
+        EXPECT_TRUE(std::strcmp(argv[1], "test") == 0);
+        EXPECT_TRUE(argv[2] == nullptr);
+    }
+    
+    {
+        const char* argv[] = {
+            "--add",
+            "-b",
+            nullptr
+        };
+        argParser.setArguments(argv, 0);
+        
+        EXPECT_EQ(argParser.nextOption(), ':');
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 1);
+        
+        EXPECT_EQ(argParser.nextOption(), 'b');
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 2);
+        
+        EXPECT_EQ(argParser.nextOption(), -1);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 2);
+        
+        EXPECT_TRUE(std::strcmp(argv[0], "--add") == 0);
+        EXPECT_TRUE(std::strcmp(argv[1], "-b") == 0);
+        EXPECT_TRUE(argv[2] == nullptr);
+    }
+    
+    {
+        const char* argv[] = {
+            "--add",
+            "b",
+            "-b",
+            nullptr
+        };
+        argParser.setArguments(argv, 0);
+        
+        EXPECT_EQ(argParser.nextOption(), 'a');
+        EXPECT_TRUE(argParser.getOptionArg() == argv[1]);
+        EXPECT_EQ(argParser.getIndex(), 2);
+        
+        EXPECT_EQ(argParser.nextOption(), 'b');
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 3);
+        
+        EXPECT_EQ(argParser.nextOption(), -1);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 3);
+        
+        EXPECT_TRUE(std::strcmp(argv[0], "--add") == 0);
+        EXPECT_TRUE(std::strcmp(argv[1], "b") == 0);
+        EXPECT_TRUE(std::strcmp(argv[2], "-b") == 0);
+        EXPECT_TRUE(argv[3] == nullptr);
+    }
+    
+    {
+        const char* argv[] = {
+            "abc",
+            "-b",
+            "beans",
+            "cool stuff",
+            "--thing",
+            "thingarg",
+            nullptr
+        };
+        argParser.setArguments(argv, 0);
+        
+        EXPECT_EQ(argParser.nextOption(), 'b');
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 2);
+        
+        EXPECT_EQ(argParser.nextOption(), 't');
+        EXPECT_TRUE(argParser.getOptionArg() == argv[5]);
+        EXPECT_EQ(argParser.getIndex(), 6);
+        
+        EXPECT_EQ(argParser.nextOption(), -1);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 3);
+        
+        EXPECT_TRUE(std::strcmp(argv[0], "-b") == 0);
+        EXPECT_TRUE(std::strcmp(argv[1], "--thing") == 0);
+        EXPECT_TRUE(std::strcmp(argv[2], "thingarg") == 0);
+        EXPECT_TRUE(std::strcmp(argv[3], "abc") == 0);
+        EXPECT_TRUE(std::strcmp(argv[4], "beans") == 0);
+        EXPECT_TRUE(std::strcmp(argv[5], "cool stuff") == 0);
+        EXPECT_TRUE(argv[6] == nullptr);
+    }
 }
