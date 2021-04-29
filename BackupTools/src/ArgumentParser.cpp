@@ -29,11 +29,7 @@ int ArgumentParser::nextOption(std::string* errorMessagePtr) {
     optionArg_ = nullptr;
     if (argv_ == nullptr) {
         return -1;
-    } else if (charIndex_ == 0 || argv_[index_][charIndex_] == '\0') {    // Check if the current argument has not been parsed yet, or if no more characters left in the current one.
-        if (charIndex_ != 0) {
-            ++index_;
-            charIndex_ = 0;
-        }
+    } else if (charIndex_ == 0) {    // Check if the current argument has not been parsed yet.
         while (true) {
             if (argv_[index_] == nullptr) {    // Check if no more arguments.
                 break;
@@ -50,13 +46,14 @@ int ArgumentParser::nextOption(std::string* errorMessagePtr) {
                 ++index_;    // Option not found.
                 return '?';
             } else if (optionFormatResult == 1) {    // Check short options.
+                charIndex_ = 1;
                 for (const OptionEntry& option : options_) {
-                    if (option.shortName == argv_[index_][1]) {
-                        charIndex_ = 2;
+                    if (option.shortName == argv_[index_][charIndex_]) {
+                        nextShortOption();
                         return foundOption(option);
                     }
                 }
-                charIndex_ = 2;    // Option not found.
+                nextShortOption();    // Option not found.
                 return '?';
             } else {    // Else, this argument is not an option.
                 nonOptionArguments_.push_back(argv_[index_]);
@@ -64,15 +61,14 @@ int ArgumentParser::nextOption(std::string* errorMessagePtr) {
             }
         }
         
-        // shuffle argv_ with nonOptionArguments_.
-        
+        // Done parsing, shuffle argv_ to put all of nonOptionArguments_ at the end.
         if (static_cast<int>(nonOptionArguments_.size()) == index_) {    // If all arguments are non-options, no shuffling required.
             index_ = 0;
             nonOptionArguments_.clear();
-        } else if (!nonOptionArguments_.empty()) {
-            int shiftDistance = 0;
+        } else if (!nonOptionArguments_.empty()) {    // Need to shuffle if at least one non-option found, otherwise the index_ is already good.
+            int shiftDistance = 0;    // Number of places to shift the current argument left in the argv_ array.
             int i = 0;
-            while (shiftDistance < static_cast<int>(nonOptionArguments_.size())) {
+            while (shiftDistance < static_cast<int>(nonOptionArguments_.size())) {    // Shift over elements not in the nonOptionArguments_ vector.
                 if (argv_[i] == nonOptionArguments_[shiftDistance]) {
                     ++shiftDistance;
                 } else {
@@ -85,62 +81,30 @@ int ArgumentParser::nextOption(std::string* errorMessagePtr) {
                 ++i;
             }
             
-            index_ = i - shiftDistance;
+            index_ = i - shiftDistance;    // Update index_ and place all nonOptionArguments_ at the end.
             for (int j = 0; j < static_cast<int>(nonOptionArguments_.size()); ++j) {
                 argv_[index_ + j] = nonOptionArguments_[j];
             }
         }
         
-        /*
-        nonOptionArguments_:
-        abc beans cool
-        
-        0   1      2     3    4     5
-        abc --help beans cool --nou nouarg nullptr
-        
-        0      1     2      3   4     5
-        --help --nou nouarg abc beans cool nullptr
-        
-        test1:
-        shiftDistance = 0
-        i = 0
-        abc --help beans cool --nou nouarg nullptr
-        
-        shiftDistance = 1
-        i = 1
-        abc --help beans cool --nou nouarg nullptr
-        
-        shiftDistance = 1
-        i = 2
-        --help --help beans cool --nou nouarg nullptr
-        
-        shiftDistance = 2
-        i = 3
-        --help --help beans cool --nou nouarg nullptr
-        
-        shiftDistance = 3
-        i = 4
-        --help --help beans cool --nou nouarg nullptr
-        
-        shiftDistance = 3
-        i = 5
-        --help --nou beans cool --nou nouarg nullptr
-        
-        shiftDistance = 3
-        i = 6
-        --help --nou nouarg cool --nou nouarg nullptr
-        */
-        
         return -1;
     } else {    // Else, continue parsing the argument.
         for (const OptionEntry& option : options_) {
             if (option.shortName == argv_[index_][charIndex_]) {
-                ++charIndex_;
+                nextShortOption();
                 return foundOption(option);
             }
         }
-        ++charIndex_;    // Option not found.
+        nextShortOption();    // Option not found.
         return '?';
+    }
+}
+
+void ArgumentParser::nextShortOption() {
+    ++charIndex_;
+    if (argv_[index_][charIndex_] == '\0') {
+        ++index_;
+        charIndex_ = 0;
     }
 }
 
@@ -159,7 +123,7 @@ bool ArgumentParser::hasParameter() {
         if (argv_[index_][charIndex_] != '\0') {    // If not at the end, no parameter.
             return false;
         }
-        ++index_;
+        ++index_;    // Note: We will never actually reach here because nextShortOption() is always called before hasParameter().
         charIndex_ = 0;
     }
     
@@ -175,26 +139,6 @@ int ArgumentParser::foundOption(const OptionEntry& option) {
             return ':';
         }
     }
-    
-    /*if (charIndex_ == 0) {    // Check if last was a long option.
-        if (argv_[index_] != nullptr && hasOptionFormat(argv_[index_]) == 0) {
-            // yay
-        } else {
-            return ':';
-        }
-    } else if (argv_[index_][charIndex_] == '\0') {    // Else, check if short option and it's at the end.
-        ++index_;
-        charIndex_ = 0;
-        if (argv_[index_] != nullptr && hasOptionFormat(argv_[index_]) == 0) {
-            // yay
-        } else {
-            return ':';
-        }
-    } else {
-        return ':';
-    }*/
-    
-    // may want to put all of the above in a function, might be tricky to update index_ and charIndex_ only when a parameter is needed tho (or maybe not idk)
     
     if (option.flagPtr == nullptr) {
         return option.value;

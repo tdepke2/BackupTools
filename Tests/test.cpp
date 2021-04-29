@@ -546,6 +546,9 @@ TEST(TestArgumentParser, Test1) {
     };
     ArgumentParser argParser(options);
     
+    EXPECT_EQ(argParser.nextOption(), -1);
+    EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+    
     {
         const char* argv[] = {
             "hello",
@@ -561,6 +564,41 @@ TEST(TestArgumentParser, Test1) {
         EXPECT_TRUE(std::strcmp(argv[0], "hello") == 0);
         EXPECT_TRUE(std::strcmp(argv[1], "test") == 0);
         EXPECT_TRUE(argv[2] == nullptr);
+    }
+    
+    {
+        const char* argv[] = {
+            "--foobar",
+            "test",
+            "-cd",
+            "a",
+            "thing",
+            nullptr
+        };
+        argParser.setArguments(argv, 0);
+        
+        EXPECT_EQ(argParser.nextOption(), '?');
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 1);
+        
+        EXPECT_EQ(argParser.nextOption(), '?');
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 2);
+        
+        EXPECT_EQ(argParser.nextOption(), '?');
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 3);
+        
+        EXPECT_EQ(argParser.nextOption(), -1);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 2);
+        
+        EXPECT_TRUE(std::strcmp(argv[0], "--foobar") == 0);
+        EXPECT_TRUE(std::strcmp(argv[1], "-cd") == 0);
+        EXPECT_TRUE(std::strcmp(argv[2], "test") == 0);
+        EXPECT_TRUE(std::strcmp(argv[3], "a") == 0);
+        EXPECT_TRUE(std::strcmp(argv[4], "thing") == 0);
+        EXPECT_TRUE(argv[5] == nullptr);
     }
     
     {
@@ -645,6 +683,119 @@ TEST(TestArgumentParser, Test1) {
         EXPECT_TRUE(std::strcmp(argv[3], "abc") == 0);
         EXPECT_TRUE(std::strcmp(argv[4], "beans") == 0);
         EXPECT_TRUE(std::strcmp(argv[5], "cool stuff") == 0);
+        EXPECT_TRUE(argv[6] == nullptr);
+    }
+}
+
+TEST(TestArgumentParser, Test2) {
+    int helpFlag, listFlag;
+    
+    ArgumentParser::OptionList options = {
+        {'h', "help", ArgumentParser::OptionalArg, &helpFlag, 'h'},
+        {'x', "compress", ArgumentParser::RequiredArg, nullptr, 'x'},
+        {'l', "list", ArgumentParser::NoArg, &listFlag, 4},
+        {'\0', "print-verbose", ArgumentParser::NoArg, nullptr, 2},
+        {'r', "", ArgumentParser::RequiredArg, nullptr, 'r'}
+    };
+    ArgumentParser argParser(options);
+    
+    helpFlag = 0;
+    listFlag = 0;
+    {
+        const char* argv[] = {
+            "bin/progname.exe",
+            "-hlrx",
+            "filename.txt",
+            nullptr
+        };
+        argParser.setArguments(argv);
+        
+        EXPECT_EQ(argParser.nextOption(), 0);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 1);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 0);
+        
+        EXPECT_EQ(argParser.nextOption(), 0);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 1);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_EQ(argParser.nextOption(), ':');
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 1);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_EQ(argParser.nextOption(), 'x');
+        EXPECT_TRUE(argParser.getOptionArg() == argv[2]);
+        EXPECT_EQ(argParser.getIndex(), 3);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_EQ(argParser.nextOption(), -1);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 3);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_TRUE(std::strcmp(argv[0], "bin/progname.exe") == 0);
+        EXPECT_TRUE(std::strcmp(argv[1], "-hlrx") == 0);
+        EXPECT_TRUE(std::strcmp(argv[2], "filename.txt") == 0);
+        EXPECT_TRUE(argv[3] == nullptr);
+    }
+    
+    helpFlag = 0;
+    listFlag = 0;
+    {
+        const char* argv[] = {
+            "bin/progname.exe",
+            "-h",
+            "-l",
+            "-r",
+            "-x",
+            "filename.txt",
+            nullptr
+        };
+        argParser.setArguments(argv);
+        
+        EXPECT_EQ(argParser.nextOption(), 0);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 2);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 0);
+        
+        EXPECT_EQ(argParser.nextOption(), 0);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 3);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_EQ(argParser.nextOption(), ':');
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 4);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_EQ(argParser.nextOption(), 'x');
+        EXPECT_TRUE(argParser.getOptionArg() == argv[5]);
+        EXPECT_EQ(argParser.getIndex(), 6);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_EQ(argParser.nextOption(), -1);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 6);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_TRUE(std::strcmp(argv[0], "bin/progname.exe") == 0);
+        EXPECT_TRUE(std::strcmp(argv[1], "-h") == 0);
+        EXPECT_TRUE(std::strcmp(argv[2], "-l") == 0);
+        EXPECT_TRUE(std::strcmp(argv[3], "-r") == 0);
+        EXPECT_TRUE(std::strcmp(argv[4], "-x") == 0);
+        EXPECT_TRUE(std::strcmp(argv[5], "filename.txt") == 0);
         EXPECT_TRUE(argv[6] == nullptr);
     }
 }

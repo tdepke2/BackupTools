@@ -88,6 +88,12 @@ class ArgumentParser {
     int charIndex_;
     
     /**
+     * Increments charIndex_ if the current argument contains more short
+     * options. If it doesn't, resets charIndex_ to zero and increments index_.
+     */
+    void nextShortOption();
+    
+    /**
      * Checks if s is an option. Returns 2 if long option, 1 if short, or 0 if
      * not an option.
      */
