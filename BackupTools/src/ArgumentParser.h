@@ -1,6 +1,7 @@
 #ifndef ARGUMENT_PARSER_H_
 #define ARGUMENT_PARSER_H_
 
+#include <string>
 #include <vector>
 
 /**
@@ -107,7 +108,7 @@ class ArgumentParser {
     /**
      * Returns the result of the option for the current index_ entry.
      */
-    int foundOption(const OptionEntry& option);
+    int foundOption(const OptionEntry& option, const std::string& optionStr);
 };
 
 #endif

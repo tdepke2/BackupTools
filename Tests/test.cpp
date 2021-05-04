@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "../BackupTools/src/ArgumentParser.h"
 #include "../BackupTools/src/FileHandler.h"
+#include <string>
 
 // ****************************************************************************
 // * TestGlobbing                                                             *
@@ -577,19 +578,27 @@ TEST(TestArgumentParser, Test1) {
         };
         argParser.setArguments(argv, 0);
         
-        EXPECT_EQ(argParser.nextOption(), '?');
+        std::string errorMessage = "";
+        EXPECT_EQ(argParser.nextOption(&errorMessage), '?');
+        EXPECT_EQ(errorMessage, "Unknown option --foobar");
         EXPECT_TRUE(argParser.getOptionArg() == nullptr);
         EXPECT_EQ(argParser.getIndex(), 1);
         
-        EXPECT_EQ(argParser.nextOption(), '?');
+        errorMessage = "";
+        EXPECT_EQ(argParser.nextOption(&errorMessage), '?');
+        EXPECT_EQ(errorMessage, "Unknown option -c");
         EXPECT_TRUE(argParser.getOptionArg() == nullptr);
         EXPECT_EQ(argParser.getIndex(), 2);
         
-        EXPECT_EQ(argParser.nextOption(), '?');
+        errorMessage = "";
+        EXPECT_EQ(argParser.nextOption(&errorMessage), '?');
+        EXPECT_EQ(errorMessage, "Unknown option -d");
         EXPECT_TRUE(argParser.getOptionArg() == nullptr);
         EXPECT_EQ(argParser.getIndex(), 3);
         
-        EXPECT_EQ(argParser.nextOption(), -1);
+        errorMessage = "";
+        EXPECT_EQ(argParser.nextOption(&errorMessage), -1);
+        EXPECT_EQ(errorMessage, "");
         EXPECT_TRUE(argParser.getOptionArg() == nullptr);
         EXPECT_EQ(argParser.getIndex(), 2);
         
@@ -609,15 +618,21 @@ TEST(TestArgumentParser, Test1) {
         };
         argParser.setArguments(argv, 0);
         
-        EXPECT_EQ(argParser.nextOption(), ':');
+        std::string errorMessage = "";
+        EXPECT_EQ(argParser.nextOption(&errorMessage), ':');
+        EXPECT_EQ(errorMessage, "Option --add requires an argument");
         EXPECT_TRUE(argParser.getOptionArg() == nullptr);
         EXPECT_EQ(argParser.getIndex(), 1);
         
-        EXPECT_EQ(argParser.nextOption(), 'b');
+        errorMessage = "";
+        EXPECT_EQ(argParser.nextOption(&errorMessage), 'b');
+        EXPECT_EQ(errorMessage, "");
         EXPECT_TRUE(argParser.getOptionArg() == nullptr);
         EXPECT_EQ(argParser.getIndex(), 2);
         
-        EXPECT_EQ(argParser.nextOption(), -1);
+        errorMessage = "";
+        EXPECT_EQ(argParser.nextOption(&errorMessage), -1);
+        EXPECT_EQ(errorMessage, "");
         EXPECT_TRUE(argParser.getOptionArg() == nullptr);
         EXPECT_EQ(argParser.getIndex(), 2);
         
@@ -797,5 +812,84 @@ TEST(TestArgumentParser, Test2) {
         EXPECT_TRUE(std::strcmp(argv[4], "-x") == 0);
         EXPECT_TRUE(std::strcmp(argv[5], "filename.txt") == 0);
         EXPECT_TRUE(argv[6] == nullptr);
+    }
+    
+    helpFlag = 0;
+    listFlag = 0;
+    {
+        const char* argv[] = {
+            "bin/progname.exe",
+            "sample-text",
+            "-h",
+            "lrx",
+            "-lr",
+            "stuff",
+            "--lr",
+            "-x",
+            "latest.log",
+            "--print-verbose",
+            "-",
+            "--",
+            "abc",
+            nullptr
+        };
+        argParser.setArguments(argv);
+        
+        EXPECT_EQ(argParser.nextOption(), 0);
+        EXPECT_TRUE(argParser.getOptionArg() == argv[3]);
+        EXPECT_EQ(argParser.getIndex(), 4);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 0);
+        
+        EXPECT_EQ(argParser.nextOption(), 0);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 4);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_EQ(argParser.nextOption(), 'r');
+        EXPECT_TRUE(argParser.getOptionArg() == argv[5]);
+        EXPECT_EQ(argParser.getIndex(), 6);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_EQ(argParser.nextOption(), '?');
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 7);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_EQ(argParser.nextOption(), 'x');
+        EXPECT_TRUE(argParser.getOptionArg() == argv[8]);
+        EXPECT_EQ(argParser.getIndex(), 9);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_EQ(argParser.nextOption(), 2);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 10);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_EQ(argParser.nextOption(), -1);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 9);
+        EXPECT_EQ(helpFlag, 'h');
+        EXPECT_EQ(listFlag, 4);
+        
+        EXPECT_TRUE(std::strcmp(argv[0], "bin/progname.exe") == 0);
+        EXPECT_TRUE(std::strcmp(argv[1], "-h") == 0);
+        EXPECT_TRUE(std::strcmp(argv[2], "lrx") == 0);
+        EXPECT_TRUE(std::strcmp(argv[3], "-lr") == 0);
+        EXPECT_TRUE(std::strcmp(argv[4], "stuff") == 0);
+        EXPECT_TRUE(std::strcmp(argv[5], "--lr") == 0);
+        EXPECT_TRUE(std::strcmp(argv[6], "-x") == 0);
+        EXPECT_TRUE(std::strcmp(argv[7], "latest.log") == 0);
+        EXPECT_TRUE(std::strcmp(argv[8], "--print-verbose") == 0);
+        EXPECT_TRUE(std::strcmp(argv[9], "sample-text") == 0);
+        EXPECT_TRUE(std::strcmp(argv[10], "-") == 0);
+        EXPECT_TRUE(std::strcmp(argv[11], "--") == 0);
+        EXPECT_TRUE(std::strcmp(argv[12], "abc") == 0);
+        EXPECT_TRUE(argv[13] == nullptr);
     }
 }
