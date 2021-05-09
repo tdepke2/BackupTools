@@ -700,6 +700,35 @@ TEST(TestArgumentParser, Test1) {
         EXPECT_TRUE(std::strcmp(argv[5], "cool stuff") == 0);
         EXPECT_TRUE(argv[6] == nullptr);
     }
+    
+    {
+        const char* argv[] = {
+            "--add",
+            "9e7",
+            "-a",
+            "-12.567",
+            nullptr
+        };
+        argParser.setArguments(argv, 0);
+        
+        EXPECT_EQ(argParser.nextOption(), 'a');
+        EXPECT_TRUE(argParser.getOptionArg() == argv[1]);
+        EXPECT_EQ(argParser.getIndex(), 2);
+        
+        EXPECT_EQ(argParser.nextOption(), 'a');
+        EXPECT_TRUE(argParser.getOptionArg() == argv[3]);
+        EXPECT_EQ(argParser.getIndex(), 4);
+        
+        EXPECT_EQ(argParser.nextOption(), -1);
+        EXPECT_TRUE(argParser.getOptionArg() == nullptr);
+        EXPECT_EQ(argParser.getIndex(), 4);
+        
+        EXPECT_TRUE(std::strcmp(argv[0], "--add") == 0);
+        EXPECT_TRUE(std::strcmp(argv[1], "9e7") == 0);
+        EXPECT_TRUE(std::strcmp(argv[2], "-a") == 0);
+        EXPECT_TRUE(std::strcmp(argv[3], "-12.567") == 0);
+        EXPECT_TRUE(argv[4] == nullptr);
+    }
 }
 
 TEST(TestArgumentParser, Test2) {

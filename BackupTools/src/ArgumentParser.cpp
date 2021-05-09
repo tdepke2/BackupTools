@@ -1,4 +1,5 @@
 #include "ArgumentParser.h"
+#include <cctype>
 #include <cstring>
 #include <exception>
 
@@ -160,7 +161,7 @@ void ArgumentParser::nextShortOption() {
 int ArgumentParser::hasOptionFormat(const char* s) {
     if (s[0] == '-' && s[1] == '-' && s[2] != '\0') {
         return 2;
-    } else if (s[0] == '-' && s[1] != '-' && s[1] != '\0') {
+    } else if (s[0] == '-' && s[1] != '-' && s[1] != '\0' && !std::isdigit(static_cast<unsigned char>(s[1]))) {    // Note that short options must not be numeric, otherwise negative numbers don't work as arguments.
         return 1;
     } else {
         return 0;
