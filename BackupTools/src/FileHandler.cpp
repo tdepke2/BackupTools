@@ -244,6 +244,11 @@ std::string FileHandler::parseNextWord(std::string::size_type& index, const std:
 }
 
 fs::path parseNextPath_(std::string::size_type& index, const std::string& str) {
+    
+    
+    // TODO: this may need a facelift now ############################################################
+    
+    
     std::string::size_type start = index;
     if (index < str.length() && str[index] == '\"') {
         ++index;

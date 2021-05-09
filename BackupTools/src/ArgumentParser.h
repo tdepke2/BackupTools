@@ -47,7 +47,7 @@ class ArgumentParser {
     ArgumentParser(OptionList options);
     
     /**
-     * Returns the argument passed with the last call to nextOption(), or
+     * Returns the parameter passed with the last call to nextOption(), or
      * nullptr if there was none.
      */
     const char* getOptionArg() const;
