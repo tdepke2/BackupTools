@@ -4,4 +4,3 @@ Fixes:
 
 Additions:
     * Catch SIGINT to gracefully stop.
-    * Need a better CLI string parser.

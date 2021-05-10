@@ -243,12 +243,19 @@ std::string FileHandler::parseNextWord(std::string::size_type& index, const std:
     return s;
 }
 
+/**
+ * Note: Double quotes can be used to encase a path and include whitespace. The
+ * quotes must appear as the first and last characters in the path, the path
+ * must also not contain any double quotes. It is theoretically possible for a
+ * path name to contain double quotes, so a ? character could be used to match
+ * it for implementations that support globbing.
+ * 
+ * This behavior is different than how splitArguments() in main.cpp handles
+ * quotes. One of the reasons for this is that a path ending with a backslash
+ * (on a Windows implementation) should recognize an ending double quote and
+ * not escape it.
+ */
 fs::path parseNextPath_(std::string::size_type& index, const std::string& str) {
-    
-    
-    // TODO: this may need a facelift now ############################################################
-    
-    
     std::string::size_type start = index;
     if (index < str.length() && str[index] == '\"') {
         ++index;
@@ -259,13 +266,13 @@ fs::path parseNextPath_(std::string::size_type& index, const std::string& str) {
             }
             ++index;
         }
-    } else {
-        while (index < str.length()) {
-            if (str[index] == ' ') {
-                return fs::path(str.substr(start, index - start)).lexically_normal();
-            }
-            ++index;
+        return fs::path(str.substr(start + 1)).lexically_normal();
+    }
+    while (index < str.length()) {
+        if (str[index] == ' ') {
+            return fs::path(str.substr(start, index - start)).lexically_normal();
         }
+        ++index;
     }
     return fs::path(str.substr(start)).lexically_normal();
 }
@@ -679,7 +686,7 @@ void FileHandler::parseNextLineInFile() {
             throw std::runtime_error("Unknown command \"" + command + "\".");
         }
         if (index < line.length()) {
-            throw std::runtime_error("Unexpected data after command.");
+            throw std::runtime_error("Unexpected data after command: \"" + line.substr(index) + "\".");
         }
     } catch (std::exception& ex) {
         throw std::runtime_error("\"" + configFilename_.string() + "\" at line " + std::to_string(lineNumber_) + ": " + ex.what());

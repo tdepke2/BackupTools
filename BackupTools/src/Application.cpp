@@ -90,7 +90,7 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     
     int spinnerIndex = 0;
     std::chrono::steady_clock::time_point spinnerLastTime = std::chrono::steady_clock::now();
-    std::cout << "Scanning for changes...\n";    // FIXME(TGD): Should this (and print spinner) not print if silent is true?
+    std::cout << "Scanning for changes...\n";    // FIXME(TGD): Should this (and print spinner) not print if silent is true? Probably should but it's weird #########################################################
     
     for (WriteReadPath nextPath = fileHandler.getNextWriteReadPath(); !nextPath.isEmpty(); nextPath = fileHandler.getNextWriteReadPath()) {
         if (lastWritePathIter == writePathsChecklist.end() || lastWritePathIter->first != nextPath.writePath) {    // Check if the write path changed and add directory contents if it is a new path.

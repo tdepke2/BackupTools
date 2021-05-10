@@ -17,6 +17,16 @@ namespace fs = std::filesystem;
 
 /**
  * Starts a backup/restore of files.
+ * 
+ * Effectively runs the "check" command, asks for confirmation, then executes
+ * each file operation in sequence. After completion the files are checked
+ * again to confirm success and also determine if there are recursion problems
+ * in the config.
+ * 
+ * The "limit" argument sets the max number of file operations to display for
+ * each type, it does not effect any changes to files. The "force" argument
+ * overrides the confirmation check and the second file check at the end, ideal
+ * for automated backup purposes.
  */
 void runCommandBackup(int argc, const char** argv) {
     if (argc < 3) {
@@ -60,6 +70,17 @@ void runCommandBackup(int argc, const char** argv) {
 
 /**
  * Lists changes to make during backup.
+ * 
+ * The configuration file is used to scan the directory hierarchy of the
+ * selected files and check for changes. Changes are classified as removed
+ * files, new files, modified files, and renamed/moved files. Note that files
+ * are counted as modified even when two files swap their filenames (this is
+ * technically just a rename, but difficult to detect without access to the
+ * file inodes). Directories are also only counted towards additions or
+ * deletions (never renames) for simplicity.
+ * 
+ * The "limit" argument sets the max number of file operations to display for
+ * each type.
  */
 void runCommandCheck(int argc, const char** argv) {
     if (argc < 3) {
@@ -101,6 +122,16 @@ void runCommandCheck(int argc, const char** argv) {
 
 /**
  * Displays tree of tracked files.
+ * 
+ * The display format is similar to the unix "tree" command. Directories are
+ * displayed in blue, and files in green, but ignored directories/files show up
+ * in yellow. Tracked files are grouped together to tie them to a common parent
+ * directory. In the case of a backup that spans multiple mount points (spread
+ * across different drives) then a separate tree is displayed for each.
+ * 
+ * The "count" argument skips displaying the tree and just outputs the final
+ * count of tracked/ignored files and directories. The "verbose" argument
+ * additionally displays the destination for each tracked file in the tree.
  */
 void runCommandTree(int argc, const char** argv) {
     if (argc < 3) {
