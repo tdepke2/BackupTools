@@ -165,25 +165,12 @@ void runCommandTree(int argc, const char** argv) {
 /**
  * Shows the command help menu.
  */
-void showHelp() {
-    std::cout << "Commands:\n";
-    std::cout << "  backup <CONFIG FILE> [OPTION]    Starts a backup/restore of files.\n";
-    std::cout << "    -l, --limit N                      Limits output to N lines (50 by default). Use negative value for no limit.\n";
-    std::cout << "    -f, --force                        Forces backup to run without confirmation check.\n";
-    std::cout << "\n";
-    std::cout << "  check <CONFIG FILE> [OPTION]     Lists changes to make during backup.\n";
-    std::cout << "    -l, --limit N                      Limits output to N lines (50 by default). Use negative value for no limit.\n";
-    std::cout << "\n";
-    std::cout << "  tree <CONFIG FILE> [OPTION]      Displays tree of tracked files.\n";
-    std::cout << "    -c, --count                        Only display the total count.\n";
-    std::cout << "    -v, --verbose                      Show tracked file destinations.\n";
-    std::cout << "\n";
-    std::cout << "  help-config                      Shows config help with examples.\n";    // TODO ################################################
-    std::cout << "\n";
-    std::cout << "  help                             Shows this menu.\n";
-    std::cout << "\n";
-    std::cout << "  exit                             Exits interactive shell.\n";
-}
+void showHelp();
+
+/**
+ * Shows the config file documentation.
+ */
+void showConfigHelp();
 
 /**
  * Parses the given arguments and attempts to run the command. The argc and
@@ -204,6 +191,8 @@ void runCommand(int argc, const char** argv) {
             runCommandCheck(argc, argv);
         } else if (command == "tree") {
             runCommandTree(argc, argv);
+        } else if (command == "help-config") {
+            showConfigHelp();
         } else if (command == "help") {
             showHelp();
         } else if (command == "exit") {
@@ -288,4 +277,182 @@ int main(int argc, const char** argv) {
     }
     
     return 0;
+}
+
+void showHelp() {
+    std::cout << "Commands:\n";
+    std::cout << "  backup <CONFIG FILE> [OPTION]    Starts a backup/restore of files.\n";
+    std::cout << "    -l, --limit N                      Limits output to N lines (50 by default). Use negative value for no limit.\n";
+    std::cout << "    -f, --force                        Forces backup to run without confirmation check.\n";
+    std::cout << "\n";
+    std::cout << "  check <CONFIG FILE> [OPTION]     Lists changes to make during backup.\n";
+    std::cout << "    -l, --limit N                      Limits output to N lines (50 by default). Use negative value for no limit.\n";
+    std::cout << "\n";
+    std::cout << "  tree <CONFIG FILE> [OPTION]      Displays tree of tracked files.\n";
+    std::cout << "    -c, --count                        Only display the total count.\n";
+    std::cout << "    -v, --verbose                      Show tracked file destinations.\n";
+    std::cout << "\n";
+    std::cout << "  help-config                      Shows config help with examples.\n";
+    std::cout << "\n";
+    std::cout << "  help                             Shows this menu.\n";
+    std::cout << "\n";
+    std::cout << "  exit                             Exits interactive shell.\n";
+}
+
+void showConfigHelp() {
+    std::cout << R"RAW_STRING(
+# Configuration files documentation (last updated on 05/31/2021).
+
+
+# Comments begin with a # symbol. They must be on their own line (only
+# whitespace can appear in front of the # symbol).
+
+
+# Some notes about paths and glob matching:
+# Paths to locations on the file system can use either forward slashes or back
+# slashes, it does not matter. This is to ensure compatibility between different
+# operating systems (Windows typically uses '\' characters while UNIX systems
+# use '/').
+# 
+# If a path contains a space anywhere, then the whole path must be encased in
+# double quotes. It doesn't hurt to always encase a path in double quotes to
+# avoid mistakes with spaces.
+# 
+# Glob matching is a way to specify multiple files/directories that match some
+# naming criteria. For example, matching all text files (.txt) and only text
+# files in the current directory can be done with a "*.txt" pattern. The
+# supported glob patterns are the following:
+# 
+#     Asterisk '*' matches any number of characters, including none. It does not
+#     match directory separators ('/' and '\') or root path names like "C:\" or
+#     "/home". See the section on "set match-hidden" for hidden files
+#     exceptions.
+#     Ex: "C:\Temp\*" will match all files and directories in the Temp\ area,
+#         but will not match anything contained within the directories.
+#     Ex: "C:\*\test*.exe" will search only the top-level directories in the C:\
+#         drive and match executable files that begin with the string "test".
+#     
+#     Question mark '?' matches any single character. Like the asterisk, it does
+#     not match directory separators or root path names.
+#     Ex: "/home/bin/???" will match any three letter items in the bin/
+#         directory.
+#     
+#     Square brackets '[' and ']' match any single character within the
+#     brackets. Putting a '!' or '^' character after the first bracket inverts
+#     the match (any character not contained within the brackets will match). A
+#     '-' can also be used between two characters to specify a range.
+#     Ex: "D:\Games\[abc]*" will match any items beginning with an a, b, or c.
+#     Ex: "D:\Data\log[0-4]" will match only the first five log files like
+#         "log0", "log1", etc.
+#     Ex: "C:\Windows\[!a-zA-Z]*" will match any items that do not begin with a
+#         letter (ones that start with a number would match).
+#     
+#     Double asterisk "**" matches any number of directories, including none.
+#     This is similar to the regular asterisk, but can match directory
+#     separators. For simplicity, this pattern must not include other adjacent
+#     characters besides directory separators.
+#     Ex: "C:\**\*.dat" will match any .dat files on the C:\ drive.
+#     Ex: "D:\Games\**" will match everything in the Games\ directory. This is
+#         slightly different than the pattern "D:\Games" because the directory
+#         name "Games" will not be included in the backup.
+
+
+# set <variable-name> <value>
+# 
+# The "set" keyword is used to set a variable that controls the behavior of the
+# program after reaching this point. A variable can be set to something else at
+# a later time. Currently supported variables are:
+# 
+# match-hidden <true/false>
+#     Controls glob matching of hidden items (any file or directory that begins
+#     with a . character). The default behavior in UNIX systems is to skip
+#     files/directories beginning with a dot that are matched by a glob (a
+#     wildcard pattern, such as a filename containing the * or ? characters).
+#     This variable can be used to match that behavior if desired.
+#     
+#     Note that this only affects glob patterns, a filename that explicitly
+#     contains a leading dot will not be affected. This also does not behave
+#     like the "ignore" keyword, a hidden file that does not match in the source
+#     area will be checked to not exist at the destination.
+#     Default is true (match everything).
+
+# This will skip tracking of hidden files/folders.
+set match-hidden false
+
+
+# root <identifier> <replacement-path>
+# 
+# The "root" keyword creates an alias for a path prefix. This is useful for
+# making the backup location easy to change by keeping the path in one place.
+# The path can be either relative to the current working directory, or absolute.
+# To reference this path, the identifier must appear as the first element in the
+# path and is used just like a directory name. Note that matching is case-
+# sensitive and the identifier can cause a directory with the same name to be
+# ignored.
+
+# Create an alias for backing up the contents of the Documents\ directory.
+root SOURCE_PATH1 C:\Users\Myself\Documents
+
+# An alias for archive\ in the parent directory (using relative path).
+root SOURCE_PATH2 ..\archive
+
+# Create a destination for backups (on a flash drive, for example).
+root DEST_PATH "E:\My Backup"
+
+
+# ignore <path>
+# 
+# The "ignore" keyword marks a type of file/directory or absolute path that will
+# not be considered in the backup. The ignore applies to both the source and
+# destination areas.
+
+# Skip tracking of all executable files.
+ignore *.exe
+
+# Skip tracking of the "System Volume Information" directory created on a flash
+# drive (so that it doesn't get marked for deletion when running backup).
+ignore "E:\System Volume Information"
+
+
+# include <path>
+# 
+# The "include" keyword removes a previously ignored path from the list,
+# effectively undoing the ignore operation past this point. This must match a
+# pattern that was ignored already, otherwise an error will be shown.
+
+# Include tracking of executable files again.
+include *.exe
+
+
+# in <destination-path> [add <source-path>]
+# 
+# The "in" keyword specifies a destination where tracked files will be placed.
+# This is typically followed by one or more "add" keywords marking the items to
+# track. One "add" keyword can be included on the same line, or multiple can
+# follow later on.
+
+# Keep the contents of Images\ synced with all .png files under Pictures\ (using
+# some glob patterns discussed earlier).
+in D:\Images add C:\Users\Myself\Pictures\**\*.png
+
+# Backup all of SOURCE_PATH1 to DEST_PATH from previous usage of the "root"
+# keyword.
+in DEST_PATH add SOURCE_PATH1
+
+
+# add <source-path>
+# 
+# The "add" keyword specifies the source files/directories to copy from. This
+# requires a destination to have been set previously from the "in" keyword. Note
+# that if a source item shows up more than once through usage of this function,
+# then only the first instance will be considered. This is to prevent cases
+# where a file would be copied to multiple locations when running a backup.
+
+# Sync all of src\, text files in the current directory, and doc\output\ to the
+# specified destination. The spacing in front of the "add" keywords is optional.
+in "DEST_PATH\more stuff"
+    add src
+    add *.txt
+    add doc\output
+)RAW_STRING";
 }
