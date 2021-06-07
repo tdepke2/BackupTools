@@ -10,8 +10,13 @@
 
 namespace fs = std::filesystem;
 
-enum CSI : int {    // Control Sequence Introducer used to set colors and formatting in terminal.
-    Reset = 0,      // https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_sequences
+/**
+ * Control Sequence Introducer used to set colors and formatting in terminal.
+ * 
+ * See: https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_sequences
+ */
+enum CSI : int {
+    Reset = 0,
     Bold = 1,
     Underline = 4,
     Inverse = 7,
@@ -34,6 +39,9 @@ enum CSI : int {    // Control Sequence Introducer used to set colors and format
 };
 std::ostream& operator<<(std::ostream& out, CSI csiCode);
 
+/**
+ * Stores info about a tracked file's read and write locations.
+ */
 struct WriteReadPath {
     fs::path writePath;
     fs::path readAbsolute;
@@ -42,26 +50,88 @@ struct WriteReadPath {
     bool isEmpty() const { return readAbsolute.empty(); }
 };
 
-bool compareFilename(const fs::path& lhs, const fs::path& rhs);    // Comparator to sort filenames (case is ignored).
+/**
+ * Comparator to sort filenames (case is ignored).
+ */
+bool compareFilename(const fs::path& lhs, const fs::path& rhs);
 
+/**
+ * Utility class to deal with config file format, file globs (pattern matching),
+ * and other file operations.
+ */
 class FileHandler {
     public:
     static char pathSeparator;
     static bool globMatchesHiddenFiles;
     
-    static bool fnmatchPortable(char const* pattern, char const* str);    // Implementation of the unix fnmatch(3) function. More details in .cpp file.
-    static bool containsWildcard(char const* pattern);    // Determines if a string contains glob wildcards.
-    static bool checkFileEquivalence(const fs::path& source, const fs::path& dest);    // Returns true if files are identical, false otherwise. Works with directories as well.
-    static void skipWhitespace(std::string::size_type& index, const std::string& str);    // Increment index while space character found in str. Automatically called at end of other parsing functions (unless an exception occurs).
-    static std::string parseNextWord(std::string::size_type& index, const std::string& str);    // Return next string in str until space found.
-    static fs::path parseNextPath(std::string::size_type& index, const std::string& str);    // Return next path (considers paths wrapped in double quotes) and normalize it.
-    static int parseNextInt(std::string::size_type& index, const std::string& str);    // Return next integer in str.
-    static bool parseNextBool(std::string::size_type& index, const std::string& str);    // Return next bool in str.
+    /**
+     * Implementation of the unix fnmatch(3) function. More details in .cpp
+     * file.
+     */
+    static bool fnmatchPortable(char const* pattern, char const* str);
     
+    /**
+     * Determines if a string contains glob wildcards.
+     */
+    static bool containsWildcard(char const* pattern);
+    
+    /**
+     * Returns true if files are identical, false otherwise. Works with
+     * directories as well.
+     */
+    static bool checkFileEquivalence(const fs::path& source, const fs::path& dest);
+    
+    /**
+     * Increment index while space character found in str. Automatically called
+     * at end of other parsing functions (unless an exception occurs).
+     */
+    static void skipWhitespace(std::string::size_type& index, const std::string& str);
+    
+    /**
+     * Return next string in str until space found.
+     */
+    static std::string parseNextWord(std::string::size_type& index, const std::string& str);
+    
+    /**
+     * Return next path (considers paths wrapped in double quotes) and normalize
+     * it.
+     */
+    static fs::path parseNextPath(std::string::size_type& index, const std::string& str);
+    
+    /**
+     * Return next integer in str.
+     */
+    static int parseNextInt(std::string::size_type& index, const std::string& str);
+    
+    /**
+     * Return next bool in str.
+     */
+    static bool parseNextBool(std::string::size_type& index, const std::string& str);
+    
+    /**
+     * Opens the file (closes the previous one if still open) and resets all
+     * internal state.
+     */
     void loadConfigFile(const fs::path& filename);
-    WriteReadPath getNextWriteReadPath();    // Get the next write/read combination from configFile_, or return empty paths if none left. Returned paths are stripped of regex and read path is unique and not contained in ignorePaths_.
-    std::vector<std::pair<fs::path, fs::path>> globPortable(fs::path pattern);    // Returns a list of absolute/local paths that match the pattern. The pattern must be in normal form.
-    bool checkPathIgnored(const fs::path& p) const;    // Iterates through all of ignorePaths_ and determines if there is a match. The complexity is O(N*M) so use carefully.
+    
+    /**
+     * Get the next write/read combination from configFile_, or return empty
+     * paths if none left. Returned paths are stripped of regex and read path is
+     * unique and not contained in ignorePaths_.
+     */
+    WriteReadPath getNextWriteReadPath();
+    
+    /**
+     * Returns a list of absolute/local paths that match the pattern. The
+     * pattern must be in normal form.
+     */
+    std::vector<std::pair<fs::path, fs::path>> globPortable(fs::path pattern);
+    
+    /**
+     * Iterates through all of ignorePaths_ and determines if there is a match.
+     * The complexity is O(N*M) so use carefully.
+     */
+    bool checkPathIgnored(const fs::path& p) const;
     
     private:
     std::ifstream configFile_;
@@ -75,9 +145,22 @@ class FileHandler {
     fs::path writePath_, readPath_;
     bool writePathSet_, readPathSet_;
     
-    static bool checkSubPathIgnored(const fs::path& ignorePath, fs::path::iterator& ignoreIter, const fs::path& currentSubPath);    // Determines if the current sub-path is ignored given the current position (ignoreIter) in ignorePath.
-    fs::path substituteRootPath(const fs::path& path);    // Substitute the path root for a match in rootPaths_ if applicable.
-    void parseNextLineInFile();    // Read next line in configFile_ (if no more lines, closes the file). Sets writePath_ and readPath_.
+    /**
+     * Determines if the current sub-path is ignored given the current position
+     * (ignoreIter) in ignorePath.
+     */
+    static bool checkSubPathIgnored(const fs::path& ignorePath, fs::path::iterator& ignoreIter, const fs::path& currentSubPath);
+    
+    /**
+     * Substitute the path root for a match in rootPaths_ if applicable.
+     */
+    fs::path substituteRootPath(const fs::path& path);
+    
+    /**
+     * Read next line in configFile_ (if no more lines, closes the file). Sets
+     * writePath_ and readPath_.
+     */
+    void parseNextLineInFile();
 };
 
 #endif

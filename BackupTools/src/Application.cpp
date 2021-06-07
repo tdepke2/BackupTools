@@ -81,7 +81,7 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
     }
 }
 
-Application::FileChanges Application::checkBackup(const fs::path& configFilename, size_t outputLimit, bool displayConfirmation, bool silent) {
+Application::FileChanges Application::checkBackup(const fs::path& configFilename, size_t outputLimit, bool displayConfirmation, bool quiet) {
     FileChanges changes;
     std::map<fs::path, std::set<fs::path>> writePathsChecklist;    // Maps a destination path to the current contents of that path.
     auto lastWritePathIter = writePathsChecklist.end();
@@ -90,7 +90,7 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     
     int spinnerIndex = 0;
     std::chrono::steady_clock::time_point spinnerLastTime = std::chrono::steady_clock::now();
-    std::cout << "Scanning for changes...\n";    // FIXME(TGD): Should this (and print spinner) not print if silent is true? Probably should but it's weird #########################################################
+    std::cout << "Scanning for changes...\n";
     
     for (WriteReadPath nextPath = fileHandler.getNextWriteReadPath(); !nextPath.isEmpty(); nextPath = fileHandler.getNextWriteReadPath()) {
         if (lastWritePathIter == writePathsChecklist.end() || lastWritePathIter->first != nextPath.writePath) {    // Check if the write path changed and add directory contents if it is a new path.
@@ -139,7 +139,7 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     optimizeForRenames(changes);
     
     std::cout << " \n";    // Clear spinner.
-    if (!silent) {
+    if (!quiet) {
         printChanges(changes, outputLimit, displayConfirmation);
     }
     return changes;
