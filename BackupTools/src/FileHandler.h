@@ -40,15 +40,45 @@ enum CSI : int {
 std::ostream& operator<<(std::ostream& out, CSI csiCode);
 
 /**
- * Stores info about a tracked file's read and write locations.
+ * Stores info about a group of tracked files with the same write and read
+ * prefix paths. The relativePaths should be laid out like a file tree (each
+ * filename includes it's parents in the set) but this is not enforced by the
+ * struct.
  */
-struct WriteReadPath {
-    fs::path writePath;
-    fs::path readAbsolute;
-    fs::path readLocal;
+struct WriteReadPathTree {
+    fs::path writePrefix;
+    fs::path readPrefix;
+    std::set<fs::path> relativePaths;
     
-    bool isEmpty() const { return readAbsolute.empty(); }
+    bool isEmpty() const { return relativePaths.empty(); }
 };
+
+/*
+// Tree method for storing paths (instead of the sorted-set idea).
+// May not want to use this in the end because of efficiency concerns, will leave it here if need to reconsider.
+
+class PathTreeNode {
+    public:
+    PathTreeNode* getParent();
+    PathTreeNode* addChild(const fs::path& subpath);
+    
+    private:
+    PathTreeNode* parent_;
+    std::vector<PathTreeNode*> children_;
+    fs::path subpath_;
+    
+    PathTree();
+};
+
+class PathTree {
+    public:
+    PathTree();
+    PathTreeNode* getRoot();
+    
+    private:
+    PathTreeNode* root_;
+};
+*/
 
 /**
  * Comparator to sort filenames (case is ignored).
@@ -115,17 +145,25 @@ class FileHandler {
     void loadConfigFile(const fs::path& filename);
     
     /**
-     * Get the next write/read combination from configFile_, or return empty
-     * paths if none left. Returned paths are stripped of regex and read path is
-     * unique and not contained in ignorePaths_.
+     * Get the next set of write/read paths from configFile_, or return empty
+     * result if none left. Returned paths are stripped of regex and read paths
+     * (the absolute paths, not just relative ones that are returned) are unique
+     * and not contained in ignorePaths_.
+     * 
+     * Unlike with globPortable(), the returned paths are guaranteed to include
+     * all of their parents.
      */
-    WriteReadPath getNextWriteReadPath();
+    WriteReadPathTree nextWriteReadPathTree();
     
     /**
-     * Returns a list of absolute/local paths that match the pattern. The
-     * pattern must be in normal form.
+     * Returns a common path prefix (an absolute path), and list of relative
+     * paths that match the pattern. The pattern must be in normal form.
+     * 
+     * Note that only the exact files/directories that match the pattern end up
+     * in the returned list. Their parent paths are not guaranteed to exist in
+     * the list.
      */
-    std::vector<std::pair<fs::path, fs::path>> globPortable(fs::path pattern);
+    std::pair<fs::path, std::vector<fs::path>> globPortable(fs::path pattern);
     
     /**
      * Iterates through all of ignorePaths_ and determines if there is a match.

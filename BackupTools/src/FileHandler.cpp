@@ -346,30 +346,49 @@ void FileHandler::loadConfigFile(const fs::path& filename) {
     readPathSet_ = false;
 }
 
-WriteReadPath FileHandler::getNextWriteReadPath() {
-    WriteReadPath result;
-    while (globPortableResults_.empty()) {
-        if (!configFile_.is_open()) {    // End of file reached, return empty result.
-            return result;
-        }
-        
+WriteReadPathTree FileHandler::nextWriteReadPathTree() {
+    WriteReadPathTree result;
+    while (configFile_.is_open()) {
         parseNextLineInFile();
         if (readPathSet_) {    // If read path encountered, grab more results from globPortable().
-            globPortableResults_ = globPortable(readPath_);
-            globPortableResultsIndex_ = 0;
+            std::pair<fs::path, std::vector<fs::path>> globPortableResults = globPortable(readPath_);
+            
+            result.writePrefix = writePath_;
+            result.readPrefix = globPortableResults.first;
+            
+            std::cout << "nextWriteReadPathTree():\n";
+            std::cout << "result.writePrefix = " << result.writePrefix << "\n";
+            std::cout << "result.readPrefix = " << result.readPrefix << "\n";
+            for (const auto& p : globPortableResults.second) {    // The results from globPortable() are just the matching items, loop through and ensure each item includes its parent paths.
+                result.relativePaths.insert(p);
+                
+                std::cout << "    " << p << "\n";
+                std::string::size_type lastSeparator = p.string().rfind(pathSeparator);
+                fs::path parentPath(p.string().substr(0, lastSeparator));
+                std::cout << "    checking " << parentPath << "\n";
+                if (result.relativePaths.insert(parentPath).second) {    // If adding parent path succeeded, step through each sub-path and make sure they are added.
+                    std::cout << "        Adding all parents:\n";
+                    while (true) {
+                        lastSeparator = p.string().rfind(pathSeparator, lastSeparator - 1);
+                        if (lastSeparator == std::string::npos || lastSeparator == 0) {
+                            break;
+                        }
+                        fs::path parentPath2(p.string().substr(0, lastSeparator));
+                        std::cout << "            " << parentPath2 << "\n";
+                        if (!result.relativePaths.insert(parentPath2).second) {    // If insertion fails, all of the parents have been accounted for.
+                            break;
+                        }
+                    }
+                }
+            }
+            
             readPathSet_ = false;
+            
+            return result;
         }
     }
     
-    result.writePath = writePath_;    // Get next result from globPortableResults_.
-    result.readAbsolute = globPortableResults_[globPortableResultsIndex_].first;
-    result.readLocal = globPortableResults_[globPortableResultsIndex_].second;
-    ++globPortableResultsIndex_;
-    if (globPortableResultsIndex_ >= globPortableResults_.size()) {
-        globPortableResults_.clear();
-    }
-    
-    return result;
+    return result;    // End of file reached, return empty result.
 }
 
 /** Globbing details:
@@ -379,9 +398,12 @@ WriteReadPath FileHandler::getNextWriteReadPath() {
         For simplicity, ** only works when by itself in a sub-path.
     For file/directory specific matching, the rules in fnmatchPortable() apply.
 */
-std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pattern) {
-    std::vector<std::pair<fs::path, fs::path>> result;
+std::pair<fs::path, std::vector<fs::path>> FileHandler::globPortable(fs::path pattern) {
+    std::pair<fs::path, std::vector<fs::path>> result;
     
+    if (pattern.filename().empty() && !pattern.empty()) {    // If pattern includes a trailing separator, remove it.
+        pattern = pattern.string().substr(0, pattern.string().length() - 1);
+    }
     if (pattern.is_relative()) {    // If pattern is relative, make it absolute.
         pattern = (fs::current_path() / pattern).lexically_normal();
     }
@@ -390,6 +412,8 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
         pattern /= "**";
         addedTrailingGlobstar = true;
     }
+    
+    std::cout << "globPortable() begins, pattern has become: \"" << pattern.string() << "\"\n";
     
     auto patternIter = pattern.begin();
     if (pattern.has_root_name()) {    // Skip root name.
@@ -409,7 +433,7 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
     auto patternIterAhead = patternIter;
     ++patternIterAhead;
     
-    while (patternIterAhead != pattern.end() && !patternIterAhead->empty() && !containsWildcard(patternIter->string().c_str())) {    // Determine the directoryPrefix (the longest path in the pattern without wildcards).
+    while (patternIterAhead != pattern.end() && !containsWildcard(patternIter->string().c_str())) {    // Determine the directoryPrefix (the longest path in the pattern without wildcards).
         fs::file_status s = fs::status(directoryPrefix / *patternIter);
         if (!fs::exists(s)) {    // Confirm the path does indeed exist and is not a file (otherwise attempt to iterate the file would fail).
             return result;
@@ -424,6 +448,7 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
     if (directoryPrefix.has_filename()) {
         ++dirPrefixOffset;
     }
+    result.first = directoryPrefix;
     
     std::stack<fs::path> pathStack;    // Stacks for recursive directory matching process.
     pathStack.push(directoryPrefix);
@@ -432,7 +457,7 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
     std::stack<std::vector<fs::path::iterator>> ignoreIterStack;
     ignoreIterStack.push({});
     
-    std::vector<fs::path> ignorePathsCopy;    // Make a copy of ignorePaths_ but append a globstar to local paths.
+    std::vector<fs::path> ignorePathsCopy;    // Make a copy of ignorePaths_ but add a globstar to the front of local paths.
     ignorePathsCopy.reserve(ignorePaths_.size());
     for (const auto& p : ignorePaths_) {
         if (p.is_relative()) {
@@ -466,18 +491,15 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
         //std::cout << "Current pathTraversal is " << pathTraversal << "\n";
         //std::cout << "Current sub-pattern is " << *currentPatternIter << "\n";
         fs::path::iterator nextPatternIter = std::next(currentPatternIter);
-        
         bool matchAllPaths = false;
-        bool addToResult = true;
+        bool addToResult = (nextPatternIter == pattern.end());    // Only add to result if at the end, otherwise the path may not match the full pattern and we don't want it.
+        
         if (*currentPatternIter == fs::path("**")) {    // If this sub-pattern is a globstar, match current path with the next sub-pattern and all contained directories with the current sub-pattern.
-            matchAllPaths = true;
-            if (nextPatternIter != pattern.end()) {
-                addToResult = false;
-            }
-            
             pathStack.push(pathTraversal);
             iterStack.push(nextPatternIter);
             ignoreIterStack.push(ignoreIters);
+            
+            matchAllPaths = true;
             nextPatternIter = currentPatternIter;
         }
         
@@ -498,7 +520,7 @@ std::vector<std::pair<fs::path, fs::path>> FileHandler::globPortable(fs::path pa
                         if (addToResult) {
                             fs::path nextPathTraversal = pathTraversal / entry.path().filename();
                             if (previousReadPaths_.insert(nextPathTraversal).second) {    // Add to result if this read path is unique.
-                                result.emplace_back(nextPathTraversal, nextPathTraversal.string().substr(dirPrefixOffset));
+                                result.second.emplace_back(nextPathTraversal.string().substr(dirPrefixOffset));
                             }
                         }
                         if (entry.is_directory()) {

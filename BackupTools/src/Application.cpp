@@ -29,7 +29,7 @@ bool Application::checkUserConfirmation() {
 
 void Application::printPaths(const fs::path& configFilename, bool verbose, bool countOnly) {
     std::map<fs::path, fs::path> readPathsMapping;    // Maps read path to corresponding write path.
-    std::map<fs::path, std::string> longestParentPaths;    // Longest common path among nextPath.readAbsolute entries (per root path).
+    std::map<fs::path, std::string> longestParentPaths;    // Longest common path among readPath entries (per root path).
     FileHandler fileHandler;
     fileHandler.loadConfigFile(configFilename);
     
@@ -37,23 +37,32 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
     std::chrono::steady_clock::time_point spinnerLastTime = std::chrono::steady_clock::now();
     std::cout << "Scanning directory structure...\n";
     
-    WriteReadPath nextPath = fileHandler.getNextWriteReadPath();
-    if (nextPath.isEmpty()) {
+    WriteReadPathTree pathTree = fileHandler.nextWriteReadPathTree();
+    auto relativePathIter = pathTree.relativePaths.begin();
+    
+    if (pathTree.isEmpty()) {
         std::cout << "\nNo files or directories found to track.\n";
         return;
     }
     
-    while (!nextPath.isEmpty()) {
-        if (!readPathsMapping.emplace(nextPath.readAbsolute, nextPath.writePath / nextPath.readLocal).second) {
-            std::cout << CSI::Yellow << "Warning: Skipping duplicate read path: " << nextPath.readAbsolute.string() << CSI::Reset << "\n";
+    while (!pathTree.isEmpty()) {
+        if (relativePathIter == pathTree.relativePaths.end()) {    // If end of relative paths, grab a new path tree.
+            pathTree = fileHandler.nextWriteReadPathTree();
+            relativePathIter = pathTree.relativePaths.begin();
+            continue;
         }
-        auto findResult = longestParentPaths.find(nextPath.readAbsolute.root_path());
+        
+        fs::path readPath = pathTree.readPrefix / *relativePathIter;
+        if (!readPathsMapping.emplace(readPath, pathTree.writePrefix / *relativePathIter).second) {
+            std::cout << CSI::Yellow << "Warning: Skipping duplicate read path: " << readPath.string() << CSI::Reset << "\n";
+        }
+        auto findResult = longestParentPaths.find(readPath.root_path());
         if (findResult == longestParentPaths.end()) {    // New root encountered, add entry for it.
-            findResult = longestParentPaths.emplace(nextPath.readAbsolute.root_path(), nextPath.readAbsolute.string()).first;
+            findResult = longestParentPaths.emplace(readPath.root_path(), readPath.string()).first;
         }
         std::string& longestParentPath = findResult->second;
-        if (longestParentPath != nextPath.readAbsolute.string().substr(0, longestParentPath.size())) {    // Update longestParentPath.
-            std::string currentParentPath = nextPath.readAbsolute.string();
+        if (longestParentPath != readPath.string().substr(0, longestParentPath.size())) {    // Update longestParentPath.
+            std::string currentParentPath = readPath.string();
             for (size_t i = 0; i < longestParentPath.size(); ++i) {
                 if (i >= currentParentPath.size()) {
                     longestParentPath = currentParentPath;
@@ -64,8 +73,8 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
             }
         }
         
-        nextPath = fileHandler.getNextWriteReadPath();
         printSpinner(spinnerIndex, spinnerLastTime);
+        ++relativePathIter;
     }
     std::cout << " \n";    // Clear spinner.
     
@@ -75,6 +84,7 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
         }
         if (fs::is_regular_file(mapIter->second) && mapIter->second.rfind(FileHandler::pathSeparator) != std::string::npos) {    // If parent path is a file, cut off the file portion before call to printTree().
             printTree(mapIter->second.substr(0, mapIter->second.rfind(FileHandler::pathSeparator) + 1), readPathsMapping, verbose, countOnly);
+            // FIXME: can i get a verification on the above? seems like +1 not needed. ####################################################################################################################
         } else {
             printTree(mapIter->second, readPathsMapping, verbose, countOnly);
         }
@@ -92,11 +102,19 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     std::chrono::steady_clock::time_point spinnerLastTime = std::chrono::steady_clock::now();
     std::cout << "Scanning for changes...\n";
     
-    for (WriteReadPath nextPath = fileHandler.getNextWriteReadPath(); !nextPath.isEmpty(); nextPath = fileHandler.getNextWriteReadPath()) {
-        if (lastWritePathIter == writePathsChecklist.end() || lastWritePathIter->first != nextPath.writePath) {    // Check if the write path changed and add directory contents if it is a new path.
-            auto insertResult = writePathsChecklist.emplace(nextPath.writePath, std::set<fs::path>());
+    WriteReadPathTree pathTree = fileHandler.nextWriteReadPathTree();
+    auto relativePathIter = pathTree.relativePaths.begin();
+    while (!pathTree.isEmpty()) {
+        if (relativePathIter == pathTree.relativePaths.end()) {    // If end of relative paths, grab a new path tree.
+            pathTree = fileHandler.nextWriteReadPathTree();
+            relativePathIter = pathTree.relativePaths.begin();
+            continue;
+        }
+        
+        if (relativePathIter == pathTree.relativePaths.begin()) {    // If first path in the set, add directory contents if it is a new writePrefix.
+            auto insertResult = writePathsChecklist.emplace(pathTree.writePrefix, std::set<fs::path>());
             if (insertResult.second) {
-                for (const auto& entry : fs::recursive_directory_iterator(nextPath.writePath)) {    // If exception during iteration of write path, checkBackup() must stop.
+                for (const auto& entry : fs::recursive_directory_iterator(pathTree.writePrefix)) {    // If exception during iteration of writePrefix, checkBackup() must stop.
                     insertResult.first->second.emplace(entry.path());
                 }
             }
@@ -104,15 +122,18 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
             lastWritePathIter = insertResult.first;
         }
         
-        fs::path destinationPath = nextPath.writePath / nextPath.readLocal;
-        if (lastWritePathIter->second.erase(destinationPath) == 0) {    // Attempt to remove the destination path from the checklist. If it's not found, then it doesn't currently exist and needs to be added.
-            auto emplaceResult = changes.additions.emplace(nextPath.readAbsolute, destinationPath);
+        fs::path readPath = pathTree.readPrefix / *relativePathIter;
+        fs::path writePath = pathTree.writePrefix / *relativePathIter;
+        if (lastWritePathIter->second.erase(writePath) == 0) {    // Attempt to remove the write path from the checklist. If it's not found, then it doesn't currently exist and needs to be added.
+            auto emplaceResult = changes.additions.emplace(readPath, writePath);
             assert(emplaceResult.second);
-        } else if (!FileHandler::checkFileEquivalence(nextPath.readAbsolute, destinationPath)) {    // If file exists but contents differ, it needs to be updated.
-            auto emplaceResult = changes.modifications.emplace(nextPath.readAbsolute, destinationPath);
+        } else if (!FileHandler::checkFileEquivalence(readPath, writePath)) {    // If file exists but contents differ, it needs to be updated.
+            auto emplaceResult = changes.modifications.emplace(readPath, writePath);
             assert(emplaceResult.second);
         }
+        
         printSpinner(spinnerIndex, spinnerLastTime);
+        ++relativePathIter;
     }
     
     for (auto& writePath : writePathsChecklist) {    // Any remaining paths in the checklist (that do not match an ignore) do not belong, mark these for deletion.

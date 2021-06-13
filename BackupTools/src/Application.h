@@ -24,8 +24,9 @@ bool compareFileChange(const std::pair<fs::path, fs::path>& lhs, const std::pair
 class Application {
     public:
     /**
-     * Keeps track of all the changes to make during a backup. Uses a custom
-     * compare function to ignore case when sorting names of files.
+     * A transaction that keeps track of all the changes to make during a
+     * backup. Uses a custom compare function to ignore case when sorting names
+     * of files.
      */
     struct FileChanges {
         std::set<fs::path, decltype(&compareFilename)> deletions;
