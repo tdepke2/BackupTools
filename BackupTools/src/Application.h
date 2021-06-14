@@ -48,7 +48,7 @@ class Application {
     /**
      * Displays tree of tracked files.
      */
-    void printPaths(const fs::path& configFilename, bool verbose, bool countOnly);
+    void printPaths(const fs::path& configFilename, bool verbose, bool countOnly, bool pruneIgnored);
     
     /**
      * Lists changes to make during backup.
@@ -83,12 +83,12 @@ class Application {
      * Used in printPaths() to handle the output of the file tree once the split
      * points for each tree are found (a tree cannot span multiple root paths).
      */
-    static void printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, bool verbose, bool countOnly);
+    static void printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, bool verbose, bool countOnly, bool pruneIgnored);
     
     /**
      * Recursive call in printTree().
      */
-    static void printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, bool verbose, bool printOutput, const std::string& prefix, PrintTreeStats* stats);
+    static void printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, bool verbose, bool printOutput, bool pruneIgnored, const std::string& prefix, PrintTreeStats* stats);
     
     /**
      * Modifies changes so that files that are equivalent and have different

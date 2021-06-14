@@ -401,7 +401,7 @@ WriteReadPathTree FileHandler::nextWriteReadPathTree() {
 std::pair<fs::path, std::vector<fs::path>> FileHandler::globPortable(fs::path pattern) {
     std::pair<fs::path, std::vector<fs::path>> result;
     
-    if (pattern.filename().empty() && !pattern.empty()) {    // If pattern includes a trailing separator, remove it.
+    if (!pattern.empty() && pattern.filename().empty() && pattern != pattern.root_path()) {    // If pattern includes a trailing separator, remove it (except if it is a root path).
         pattern = pattern.string().substr(0, pattern.string().length() - 1);
     }
     if (pattern.is_relative()) {    // If pattern is relative, make it absolute.
@@ -493,6 +493,9 @@ std::pair<fs::path, std::vector<fs::path>> FileHandler::globPortable(fs::path pa
         fs::path::iterator nextPatternIter = std::next(currentPatternIter);
         bool matchAllPaths = false;
         bool addToResult = (nextPatternIter == pattern.end());    // Only add to result if at the end, otherwise the path may not match the full pattern and we don't want it.
+        if (addedTrailingGlobstar && *nextPatternIter == fs::path("**") && std::next(nextPatternIter) == pattern.end()) {    // Special case if globstar appended and pattern points to a file.
+            addToResult = true;
+        }
         
         if (*currentPatternIter == fs::path("**")) {    // If this sub-pattern is a globstar, match current path with the next sub-pattern and all contained directories with the current sub-pattern.
             pathStack.push(pathTraversal);

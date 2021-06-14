@@ -27,7 +27,7 @@ bool Application::checkUserConfirmation() {
     return acceptInputs.count(inputCleaned) > 0;
 }
 
-void Application::printPaths(const fs::path& configFilename, bool verbose, bool countOnly) {
+void Application::printPaths(const fs::path& configFilename, bool verbose, bool countOnly, bool pruneIgnored) {
     std::map<fs::path, fs::path> readPathsMapping;    // Maps read path to corresponding write path.
     std::map<fs::path, std::string> longestParentPaths;    // Longest common path among readPath entries (per root path).
     FileHandler fileHandler;
@@ -53,7 +53,11 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
         }
         
         fs::path readPath = pathTree.readPrefix / *relativePathIter;
-        if (!readPathsMapping.emplace(readPath, pathTree.writePrefix / *relativePathIter).second) {
+        fs::path writePath;
+        if (verbose) {    // Only set the writePath if we actually use it.
+            writePath = pathTree.writePrefix / *relativePathIter;
+        }
+        if (!readPathsMapping.emplace(readPath, writePath).second) {
             std::cout << CSI::Yellow << "Warning: Skipping duplicate read path: " << readPath.string() << CSI::Reset << "\n";
         }
         auto findResult = longestParentPaths.find(readPath.root_path());
@@ -62,16 +66,24 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
         }
         std::string& longestParentPath = findResult->second;
         if (longestParentPath != readPath.string().substr(0, longestParentPath.size())) {    // Update longestParentPath.
+            std::cout << "Need to update longestParentPath (\"" << longestParentPath << "\").\n";
             std::string currentParentPath = readPath.string();
             for (size_t i = 0; i < longestParentPath.size(); ++i) {
                 if (i >= currentParentPath.size()) {
                     longestParentPath = currentParentPath;
                     break;
-                } else if (longestParentPath[i] != currentParentPath[i]) {
-                    longestParentPath = currentParentPath.substr(0, i);
+                } else if (longestParentPath[i] != currentParentPath[i]) {    // If a different sub-path is found, step back to the last sub-path that both have in common and make this the new longestParentPath.
+                    std::string::size_type previousSeparator = currentParentPath.rfind(FileHandler::pathSeparator, i - 1);
+                    
+                    if (previousSeparator == std::string::npos || readPath.root_path().string().length() > previousSeparator) {    // Edge case in case we're close to the root path.
+                        longestParentPath = readPath.root_path().string();
+                    } else {
+                        longestParentPath = currentParentPath.substr(0, previousSeparator);
+                    }
                 }
             }
         }
+        std::cout << "longestParentPath = \"" << longestParentPath << "\".\n";
         
         printSpinner(spinnerIndex, spinnerLastTime);
         ++relativePathIter;
@@ -83,10 +95,11 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
             std::cout << "\n";
         }
         if (fs::is_regular_file(mapIter->second) && mapIter->second.rfind(FileHandler::pathSeparator) != std::string::npos) {    // If parent path is a file, cut off the file portion before call to printTree().
-            printTree(mapIter->second.substr(0, mapIter->second.rfind(FileHandler::pathSeparator) + 1), readPathsMapping, verbose, countOnly);
-            // FIXME: can i get a verification on the above? seems like +1 not needed. ####################################################################################################################
+            std::cout << "case1: calling printTree() with \"" << mapIter->second.substr(0, mapIter->second.rfind(FileHandler::pathSeparator)) << "\"\n";
+            printTree(mapIter->second.substr(0, mapIter->second.rfind(FileHandler::pathSeparator)), readPathsMapping, verbose, countOnly, pruneIgnored);
         } else {
-            printTree(mapIter->second, readPathsMapping, verbose, countOnly);
+            std::cout << "case2: calling printTree() with \"" << mapIter->second << "\"\n";
+            printTree(mapIter->second, readPathsMapping, verbose, countOnly, pruneIgnored);
         }
     }
 }
@@ -314,14 +327,14 @@ void Application::startBackup(const fs::path& configFilename, size_t outputLimit
     }
 }
 
-void Application::printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, bool verbose, bool countOnly) {
+void Application::printTree(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, bool verbose, bool countOnly, bool pruneIgnored) {
     fs::file_status searchPathStatus = fs::status(searchPath);
     if (!fs::exists(searchPathStatus)) {
         throw std::runtime_error("\"" + searchPath.string() + "\": Unable to find path.");
     } else if (fs::is_directory(searchPathStatus)) {
         std::cout << CSI::Cyan << searchPath.string() << CSI::Reset << "\n";
         PrintTreeStats stats;
-        printTree2(searchPath, readPathsMapping, verbose, !countOnly, "", &stats);
+        printTree2(searchPath, readPathsMapping, verbose, !countOnly, pruneIgnored, "", &stats);
         
         std::cout << "\n" << stats.numDirectories << " directories, " << stats.numFiles << " files\n";
         std::cout << stats.numIgnoredDirectories << " ignored directories, " << stats.numIgnoredFiles << " ignored files\n";
@@ -330,7 +343,7 @@ void Application::printTree(const fs::path& searchPath, const std::map<fs::path,
     }
 }
 
-void Application::printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, bool verbose, bool printOutput, const std::string& prefix, PrintTreeStats* stats) {
+void Application::printTree2(const fs::path& searchPath, const std::map<fs::path, fs::path>& readPathsMapping, bool verbose, bool printOutput, bool pruneIgnored, const std::string& prefix, PrintTreeStats* stats) {
     std::vector<fs::directory_entry> searchContents;
     //std::priority_queue<fs::directory_entry, std::vector<fs::directory_entry>, decltype(&compareFilename)> searchContents(&compareFilename);    // Tested priority queue optimization, but turned out to be about 1.5 times slower.
     try {
@@ -361,6 +374,20 @@ void Application::printTree2(const fs::path& searchPath, const std::map<fs::path
     }
     
     std::sort(searchContents.begin(), searchContents.end(), compareFilename);
+    
+    if (pruneIgnored) {    // Determine if all children are ignored, and display ellipsis if so.
+        bool allIgnored = true;
+        for (size_t i = 0; i < searchContents.size(); ++i) {
+            if (readPathsMapping.find(searchContents[i].path()) != readPathsMapping.end()) {
+                allIgnored = false;
+                break;
+            }
+        }
+        if (allIgnored && printOutput) {
+            std::cout << prefix << "\'-- " << CSI::Yellow << "(...)" << CSI::Reset << "\n";
+            printOutput = false;
+        }
+    }
     for (size_t i = 0; i < searchContents.size(); ++i) {
         if (printOutput) {
             std::cout << prefix;
@@ -377,7 +404,7 @@ void Application::printTree2(const fs::path& searchPath, const std::map<fs::path
             if (!isTracked) {
                 ++stats->numIgnoredDirectories;
             }
-            printTree2(searchContents[i].path(), readPathsMapping, verbose, printOutput, prefix + (isLast ? "    " : "|   "), stats);
+            printTree2(searchContents[i].path(), readPathsMapping, verbose, printOutput, pruneIgnored, prefix + (isLast ? "    " : "|   "), stats);
         } else {
             ++stats->numFiles;
             if (printOutput) {

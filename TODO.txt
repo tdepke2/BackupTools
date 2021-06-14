@@ -1,4 +1,5 @@
 Fixes:
+    * Can moves occur across drives? Need to test.
     * Bug in file matching. The pattern "*/*.txt" should match all text files in the immediate children dirs, but it currently also matches everything that "*" does. Look into FileHandler::globPortable().
     * Bug in tree. The pattern "recursive*/*.txt" shows only the part of the tree for recursive/ directory, wrong root path calculation? The check command works fine though.
     * Bug in backup. The pattern "????/**/*.txt" matches text files in 4 letter dirs properly, but backup does not include the correct directories to create and fails.

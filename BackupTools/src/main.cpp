@@ -131,7 +131,10 @@ void runCommandCheck(int argc, const char** argv) {
  * 
  * The "count" argument skips displaying the tree and just outputs the final
  * count of tracked/ignored files and directories. The "verbose" argument
- * additionally displays the destination for each tracked file in the tree.
+ * additionally displays the destination for each tracked file in the tree. The
+ * "prune" argument hides away sections of the tree that only contain ignored
+ * files/directories, this does not effect the total file and directory counts.
+ * These are shown with an "(...)" symbol.
  */
 void runCommandTree(int argc, const char** argv) {
     if (argc < 3) {
@@ -141,9 +144,11 @@ void runCommandTree(int argc, const char** argv) {
     
     int countOnly = 0;
     int verbose = 0;
+    int pruneIgnored = 0;
     ArgumentParser argParser({
         {'c', "count", ArgumentParser::NoArg, &countOnly, 1},
-        {'v', "verbose", ArgumentParser::NoArg, &verbose, 1}
+        {'v', "verbose", ArgumentParser::NoArg, &verbose, 1},
+        {'p', "prune", ArgumentParser::NoArg, &pruneIgnored, 1}
     });
     argParser.setArguments(argv, 3);
     
@@ -159,7 +164,7 @@ void runCommandTree(int argc, const char** argv) {
     }
     
     Application app;
-    app.printPaths(configFilename, static_cast<bool>(verbose), static_cast<bool>(countOnly));
+    app.printPaths(configFilename, static_cast<bool>(verbose), static_cast<bool>(countOnly), static_cast<bool>(pruneIgnored));
 }
 
 /**
@@ -291,6 +296,7 @@ void showHelp() {
     std::cout << "  tree <CONFIG FILE> [OPTION]      Displays tree of tracked files.\n";
     std::cout << "    -c, --count                        Only display the total count.\n";
     std::cout << "    -v, --verbose                      Show tracked file destinations.\n";
+    std::cout << "    -p, --prune                        Hide sub-trees that only contain ignored items.\n";
     std::cout << "\n";
     std::cout << "  help-config                      Shows config help with examples.\n";
     std::cout << "\n";
