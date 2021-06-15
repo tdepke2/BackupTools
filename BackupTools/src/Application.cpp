@@ -95,11 +95,18 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
             std::cout << "\n";
         }
         if (fs::is_regular_file(mapIter->second) && mapIter->second.rfind(FileHandler::pathSeparator) != std::string::npos) {    // If parent path is a file, cut off the file portion before call to printTree().
-            std::cout << "case1: calling printTree() with \"" << mapIter->second.substr(0, mapIter->second.rfind(FileHandler::pathSeparator)) << "\"\n";
-            printTree(mapIter->second.substr(0, mapIter->second.rfind(FileHandler::pathSeparator)), readPathsMapping, verbose, countOnly, pruneIgnored);
+            std::string::size_type previousSeparator = mapIter->second.rfind(FileHandler::pathSeparator);
+            fs::path searchPath;
+            if (previousSeparator == std::string::npos || mapIter->first.string().length() > previousSeparator) {    // Edge case in case we're close to the root path.
+                searchPath = mapIter->first;
+            } else {
+                searchPath = mapIter->second.substr(0, previousSeparator);
+            }
+            std::cout << "case1: calling printTree() with \"" << searchPath.string() << "\"\n";
+            printTree(searchPath, readPathsMapping, verbose, countOnly, pruneIgnored);
         } else {
             std::cout << "case2: calling printTree() with \"" << mapIter->second << "\"\n";
-            printTree(mapIter->second, readPathsMapping, verbose, countOnly, pruneIgnored);
+            printTree(fs::path(mapIter->second), readPathsMapping, verbose, countOnly, pruneIgnored);
         }
     }
 }
@@ -127,8 +134,12 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
         if (relativePathIter == pathTree.relativePaths.begin()) {    // If first path in the set, add directory contents if it is a new writePrefix.
             auto insertResult = writePathsChecklist.emplace(pathTree.writePrefix, std::set<fs::path>());
             if (insertResult.second) {
-                for (const auto& entry : fs::recursive_directory_iterator(pathTree.writePrefix)) {    // If exception during iteration of writePrefix, checkBackup() must stop.
-                    insertResult.first->second.emplace(entry.path());
+                try {
+                    for (const auto& entry : fs::recursive_directory_iterator(pathTree.writePrefix)) {
+                        insertResult.first->second.emplace(entry.path());
+                    }
+                } catch (fs::filesystem_error&) {    // If exception during iteration of writePrefix, assume the directory does not currently exist and attempt to create it.
+                    fs::create_directories(pathTree.writePrefix);
                 }
             }
             
@@ -292,7 +303,7 @@ void Application::startBackup(const fs::path& configFilename, size_t outputLimit
         if (fs::is_directory(p.first)) {
             fs::create_directory(p.second);
         } else {
-            fs::copy(p.first, p.second);
+            fs::copy_file(p.first, p.second);    // Note, fs::copy_file() is used explicitly here since there seems to be some bugs present in fs::copy() (observed when copying single file from FAT32 to NTFS drive).
         }
         ++currOperation;
     }
@@ -314,7 +325,7 @@ void Application::startBackup(const fs::path& configFilename, size_t outputLimit
     for (const auto& p : changes.modifications) {
         printProgressBar(currOperation / numOperations);
         std::cout << "Replacing " << p.second.string() << "\n";
-        fs::copy(p.first, p.second, fs::copy_options::overwrite_existing);
+        fs::copy_file(p.first, p.second, fs::copy_options::overwrite_existing);
         ++currOperation;
     }
     
@@ -421,6 +432,15 @@ void Application::printTree2(const fs::path& searchPath, const std::map<fs::path
     }
 }
 
+/**
+ * Due to the way rename detection works, only files can make their way out of
+ * additions/deletions and into the renames bin. Directories are always either
+ * added or deleted. Rename detection also does not consider which mount point a
+ * file is located on, so a file can be marked as "renamed" when it needs to
+ * travel across a drive partition (even from a FAT32 to NTFS format). In
+ * practice this works fine as the fs::rename() operation is designed to handle
+ * this.
+ */
 void Application::optimizeForRenames(FileChanges& changes) {
     std::map<std::uintmax_t, std::set<fs::path>> deletionsFileSizes;    // Map file sizes to their paths for quick lookup of which files match the contents of a path.
     for (const auto& p : changes.deletions) {
