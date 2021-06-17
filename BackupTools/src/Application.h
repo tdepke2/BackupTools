@@ -80,6 +80,14 @@ class Application {
     };
     
     /**
+     * Determines the longest common parent between lastPath and currentPath and
+     * updates lastPath to equal this. This can only cause lastPath to stay the
+     * same, or become truncated. The currentRootPath parameter is the root path
+     * of currentPath, the root paths must all be the same.
+     */
+    static void findCommonParentPath(std::string& lastPath, const std::string& currentPath, const std::string& currentRootPath);
+    
+    /**
      * Used in printPaths() to handle the output of the file tree once the split
      * points for each tree are found (a tree cannot span multiple root paths).
      */

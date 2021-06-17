@@ -64,26 +64,9 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
         if (findResult == longestParentPaths.end()) {    // New root encountered, add entry for it.
             findResult = longestParentPaths.emplace(readPath.root_path(), readPath.string()).first;
         }
-        std::string& longestParentPath = findResult->second;
-        if (longestParentPath != readPath.string().substr(0, longestParentPath.size())) {    // Update longestParentPath.
-            std::cout << "Need to update longestParentPath (\"" << longestParentPath << "\").\n";
-            std::string currentParentPath = readPath.string();
-            for (size_t i = 0; i < longestParentPath.size(); ++i) {
-                if (i >= currentParentPath.size()) {
-                    longestParentPath = currentParentPath;
-                    break;
-                } else if (longestParentPath[i] != currentParentPath[i]) {    // If a different sub-path is found, step back to the last sub-path that both have in common and make this the new longestParentPath.
-                    std::string::size_type previousSeparator = currentParentPath.rfind(FileHandler::pathSeparator, i - 1);
-                    
-                    if (previousSeparator == std::string::npos || readPath.root_path().string().length() > previousSeparator) {    // Edge case in case we're close to the root path.
-                        longestParentPath = readPath.root_path().string();
-                    } else {
-                        longestParentPath = currentParentPath.substr(0, previousSeparator);
-                    }
-                }
-            }
-        }
-        std::cout << "longestParentPath = \"" << longestParentPath << "\".\n";
+        
+        findCommonParentPath(findResult->second, readPath.string(), readPath.root_path().string());    // Update the longest parent path.
+        std::cout << "longestParentPath = \"" << findResult->second << "\".\n";
         
         printSpinner(spinnerIndex, spinnerLastTime);
         ++relativePathIter;
@@ -334,6 +317,28 @@ void Application::startBackup(const fs::path& configFilename, size_t outputLimit
         if (!changesAfter.isEmpty()) {
             std::cout << "\n" << CSI::Yellow << "Warning: Found remaining changes after running backup. This may have been caused by an error during\n";
             std::cout << "file operations or recursive rules in the config file. Run \"check <config file>\" for more details." << CSI::Reset << "\n";
+        }
+    }
+}
+
+void Application::findCommonParentPath(std::string& lastPath, const std::string& currentPath, const std::string& currentRootPath) {
+    std::string::size_type nextSeparator = currentPath.find(FileHandler::pathSeparator, lastPath.length());    // Find the separator in currentPath after the length of lastPath (may not be found).
+    
+    if (lastPath != currentPath.substr(0, nextSeparator)) {    // If the paths differ, need to update lastPath.
+        std::cout << "Need to update lastPath (\"" << lastPath << "\").\n";
+        size_t i = 0;
+        while (true) {
+            if (i >= lastPath.length() || i >= currentPath.length() || lastPath[i] != currentPath[i]) {    // When a different sub-path is found, step back to the last sub-path that both have in common and make this the new lastPath.
+                std::string::size_type previousSeparator = currentPath.rfind(FileHandler::pathSeparator, i - 1);
+                
+                if (previousSeparator == std::string::npos || currentRootPath.length() > previousSeparator) {    // Edge case in case we're close to the root path.
+                    lastPath = currentRootPath;
+                } else {
+                    lastPath = currentPath.substr(0, previousSeparator);
+                }
+                return;
+            }
+            ++i;
         }
     }
 }
