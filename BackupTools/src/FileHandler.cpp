@@ -350,31 +350,25 @@ WriteReadPathTree FileHandler::nextWriteReadPathTree() {
     WriteReadPathTree result;
     while (configFile_.is_open()) {
         parseNextLineInFile();
+        
         if (readPathSet_) {    // If read path encountered, grab more results from globPortable().
             std::pair<fs::path, std::vector<fs::path>> globPortableResults = globPortable(readPath_);
-            
             result.writePrefix = writePath_;
             result.readPrefix = globPortableResults.first;
             
-            std::cout << "nextWriteReadPathTree():\n";
-            std::cout << "result.writePrefix = " << result.writePrefix << "\n";
-            std::cout << "result.readPrefix = " << result.readPrefix << "\n";
             for (const auto& p : globPortableResults.second) {    // The results from globPortable() are just the matching items, loop through and ensure each item includes its parent paths.
                 result.relativePaths.insert(p);
                 
-                std::cout << "    " << p << "\n";
                 std::string::size_type lastSeparator = p.string().rfind(pathSeparator);
                 fs::path parentPath(p.string().substr(0, lastSeparator));
-                std::cout << "    checking " << parentPath << "\n";
                 if (result.relativePaths.insert(parentPath).second) {    // If adding parent path succeeded, step through each sub-path and make sure they are added.
-                    std::cout << "        Adding all parents:\n";
                     while (true) {
                         lastSeparator = p.string().rfind(pathSeparator, lastSeparator - 1);
                         if (lastSeparator == std::string::npos || lastSeparator == 0) {
                             break;
                         }
+                        
                         fs::path parentPath2(p.string().substr(0, lastSeparator));
-                        std::cout << "            " << parentPath2 << "\n";
                         if (!result.relativePaths.insert(parentPath2).second) {    // If insertion fails, all of the parents have been accounted for.
                             break;
                         }
@@ -412,8 +406,6 @@ std::pair<fs::path, std::vector<fs::path>> FileHandler::globPortable(fs::path pa
         pattern /= "**";
         addedTrailingGlobstar = true;
     }
-    
-    std::cout << "globPortable() begins, pattern has become: \"" << pattern.string() << "\"\n";
     
     auto patternIter = pattern.begin();
     if (pattern.has_root_name()) {    // Skip root name.

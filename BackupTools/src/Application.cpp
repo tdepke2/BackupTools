@@ -66,7 +66,6 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
         }
         
         findCommonParentPath(findResult->second, readPath.string(), readPath.root_path().string());    // Update the longest parent path.
-        std::cout << "longestParentPath = \"" << findResult->second << "\".\n";
         
         printSpinner(spinnerIndex, spinnerLastTime);
         ++relativePathIter;
@@ -85,10 +84,8 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
             } else {
                 searchPath = mapIter->second.substr(0, previousSeparator);
             }
-            std::cout << "case1: calling printTree() with \"" << searchPath.string() << "\"\n";
             printTree(searchPath, readPathsMapping, verbose, countOnly, pruneIgnored);
         } else {
-            std::cout << "case2: calling printTree() with \"" << mapIter->second << "\"\n";
             printTree(fs::path(mapIter->second), readPathsMapping, verbose, countOnly, pruneIgnored);
         }
     }
@@ -325,7 +322,6 @@ void Application::findCommonParentPath(std::string& lastPath, const std::string&
     std::string::size_type nextSeparator = currentPath.find(FileHandler::pathSeparator, lastPath.length());    // Find the separator in currentPath after the length of lastPath (may not be found).
     
     if (lastPath != currentPath.substr(0, nextSeparator)) {    // If the paths differ, need to update lastPath.
-        std::cout << "Need to update lastPath (\"" << lastPath << "\").\n";
         size_t i = 0;
         while (true) {
             if (i >= lastPath.length() || i >= currentPath.length() || lastPath[i] != currentPath[i]) {    // When a different sub-path is found, step back to the last sub-path that both have in common and make this the new lastPath.
