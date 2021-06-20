@@ -36,9 +36,11 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
     int spinnerIndex = 0;
     std::chrono::steady_clock::time_point spinnerLastTime = std::chrono::steady_clock::now();
     std::cout << "Scanning directory structure...\n";
+    size_t scanCounter = 0;
     
     WriteReadPathTree pathTree = fileHandler.nextWriteReadPathTree();
     auto relativePathIter = pathTree.relativePaths.begin();
+    scanCounter += pathTree.relativePaths.size();
     
     if (pathTree.isEmpty()) {
         std::cout << "\nNo files or directories found to track.\n";
@@ -49,6 +51,7 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
         if (relativePathIter == pathTree.relativePaths.end()) {    // If end of relative paths, grab a new path tree.
             pathTree = fileHandler.nextWriteReadPathTree();
             relativePathIter = pathTree.relativePaths.begin();
+            scanCounter += pathTree.relativePaths.size();
             continue;
         }
         
@@ -70,7 +73,7 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
         printSpinner(spinnerIndex, spinnerLastTime);
         ++relativePathIter;
     }
-    std::cout << " \n";    // Clear spinner.
+    std::cout << "Discovered " << scanCounter << " items.\n\n";    // Clear spinner and output scan totals.
     
     for (auto mapIter = longestParentPaths.begin(); mapIter != longestParentPaths.end(); ++mapIter) {
         if (mapIter != longestParentPaths.begin()) {
@@ -101,13 +104,17 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     int spinnerIndex = 0;
     std::chrono::steady_clock::time_point spinnerLastTime = std::chrono::steady_clock::now();
     std::cout << "Scanning for changes...\n";
+    size_t scanCounter = 0;
     
     WriteReadPathTree pathTree = fileHandler.nextWriteReadPathTree();
     auto relativePathIter = pathTree.relativePaths.begin();
+    scanCounter += pathTree.relativePaths.size();
+    
     while (!pathTree.isEmpty()) {
         if (relativePathIter == pathTree.relativePaths.end()) {    // If end of relative paths, grab a new path tree.
             pathTree = fileHandler.nextWriteReadPathTree();
             relativePathIter = pathTree.relativePaths.begin();
+            scanCounter += pathTree.relativePaths.size();
             continue;
         }
         
@@ -163,7 +170,7 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     
     optimizeForRenames(changes);
     
-    std::cout << " \n";    // Clear spinner.
+    std::cout << "Discovered " << scanCounter << " items.\n\n";    // Clear spinner and output scan totals.
     if (!quiet) {
         printChanges(changes, outputLimit, displayConfirmation);
     }
@@ -273,47 +280,52 @@ void Application::startBackup(const fs::path& configFilename, size_t outputLimit
         return;
     }
     
-    double numOperations = static_cast<double>(changes.getCount());
-    size_t currOperation = 1;
+    size_t numOperations = changes.getCount();
+    size_t numCompleted = 0;
     std::cout << "\n\n\n";    // Go down 3 lines (1 for spacing, 2 for printProgressBar() alignment).
     
     for (const auto& p : changes.additions) {
-        printProgressBar(currOperation / numOperations);
+        printProgressBar(numCompleted, numOperations);
         std::cout << "Adding " << p.second.string() << "\n";
         if (fs::is_directory(p.first)) {
             fs::create_directory(p.second);
         } else {
             fs::copy_file(p.first, p.second);    // Note, fs::copy_file() is used explicitly here since there seems to be some bugs present in fs::copy() (observed when copying single file from FAT32 to NTFS drive).
         }
-        ++currOperation;
+        ++numCompleted;
     }
     
     for (const auto& p : changes.renames) {    // Renaming must happen after additions and before removals so that there are no missing directory conflicts.
-        printProgressBar(currOperation / numOperations);
+        printProgressBar(numCompleted, numOperations);
         std::cout << "Renaming " << p.first.string() << "\n";
         fs::rename(p.first, p.second);
-        ++currOperation;
+        ++numCompleted;
     }
     
     for (auto setIter = changes.deletions.rbegin(); setIter != changes.deletions.rend(); ++setIter) {    // Iterate through deletions in reverse to avoid using recursive delete function.
-        printProgressBar(currOperation / numOperations);
+        printProgressBar(numCompleted, numOperations);
         std::cout << "Removing " << setIter->string() << "\n";
         fs::remove(*setIter);
-        ++currOperation;
+        ++numCompleted;
     }
     
     for (const auto& p : changes.modifications) {
-        printProgressBar(currOperation / numOperations);
+        printProgressBar(numCompleted, numOperations);
         std::cout << "Replacing " << p.second.string() << "\n";
         fs::copy_file(p.first, p.second, fs::copy_options::overwrite_existing);
-        ++currOperation;
+        ++numCompleted;
     }
+    
+    printProgressBar(numCompleted, numOperations);
+    std::cout << "File operations completed.\n";
     
     if (!forceBackup) {
         FileChanges changesAfter = checkBackup(configFilename, outputLimit, true, true);
         if (!changesAfter.isEmpty()) {
-            std::cout << "\n" << CSI::Yellow << "Warning: Found remaining changes after running backup. This may have been caused by an error during\n";
+            std::cout << CSI::Yellow << "Warning: Found remaining changes after running backup. This may have been caused by an error during\n";
             std::cout << "file operations or recursive rules in the config file. Run \"check <config file>\" for more details." << CSI::Reset << "\n";
+        } else {
+            std::cout << "Done.\n";
         }
     }
 }
@@ -487,11 +499,11 @@ void Application::printSpinner(int& index, std::chrono::steady_clock::time_point
     }
 }
 
-void Application::printProgressBar(double progress) {
-    constexpr int MAX_BAR_SIZE = 40;
+void Application::printProgressBar(size_t current, size_t total) {
+    constexpr int MAX_BAR_SIZE = 80;
     
-    std::string percent = std::to_string(std::lround(progress * 100.0)) + "%";
-    int barLength = std::lround(progress * MAX_BAR_SIZE);
+    std::string percent = std::to_string(std::lround(static_cast<double>(current) / total * 100.0)) + "%";
+    int barLength = std::lround(static_cast<double>(current) / total * MAX_BAR_SIZE);
     std::cout << "\033[2A";    // Move cursor up by 2.
     std::cout << std::left << std::setw(4) << percent << std::right << '[' << std::setfill('=') << std::setw(barLength) << '>' << std::setfill(' ') << std::setw(MAX_BAR_SIZE - barLength + (barLength > 0 ? 1 : 0)) << ']' << '\n';
     std::cout << "\033[2K";    // Clear line.

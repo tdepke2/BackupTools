@@ -111,10 +111,10 @@ class Application {
     static void printSpinner(int& index, std::chrono::steady_clock::time_point& lastTime);
     
     /**
-     * Display progress bar with a message below. Value for progress must be in
-     * the 0.0 to 1.0 range.
+     * Display progress bar with a message below. Progress goes from 0% up to
+     * 100% when current is equal to total.
      */
-    static void printProgressBar(double progress);
+    static void printProgressBar(size_t current, size_t total);
 };
 
 #endif
