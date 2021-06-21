@@ -108,8 +108,13 @@ class FileHandler {
     /**
      * Returns true if files are identical, false otherwise. Works with
      * directories as well.
+     * 
+     * The fastCompare parameter skips the binary scan of each file and only
+     * returns true if the file modification timestamps match (if the times are
+     * within 2 seconds of each other to be exact, due to slightly different
+     * time representations across digital storage mediums).
      */
-    static bool checkFileEquivalence(const fs::path& source, const fs::path& dest);
+    static bool checkFileEquivalence(const fs::path& source, const fs::path& dest, bool fastCompare = false);
     
     /**
      * Increment index while space character found in str. Automatically called

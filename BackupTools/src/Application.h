@@ -40,6 +40,17 @@ class Application {
     };
     
     /**
+     * Options passed to checkBackup() and startBackup() to condense the amount
+     * of parameters needed for these functions.
+     */
+    struct BackupOptions {
+        size_t outputLimit;
+        bool displayConfirmation;
+        bool fastCompare;
+        bool forceBackup;
+    };
+    
+    /**
      * Gets user input and returns true only if any variant of "yes" was
      * entered.
      */
@@ -53,7 +64,7 @@ class Application {
     /**
      * Lists changes to make during backup.
      */
-    FileChanges checkBackup(const fs::path& configFilename, size_t outputLimit, bool displayConfirmation = false, bool quiet = false);
+    FileChanges checkBackup(const fs::path& configFilename, const BackupOptions& options);
     
     /**
      * Prints a list of deletions, additions, modifications, renames, and the
@@ -64,7 +75,7 @@ class Application {
     /**
      * Starts a backup/restore of files.
      */
-    void startBackup(const fs::path& configFilename, size_t outputLimit, bool forceBackup);
+    void startBackup(const fs::path& configFilename, const BackupOptions& options);
     
     private:
     /**
@@ -103,7 +114,7 @@ class Application {
      * paths are removed from changes.deletions/changes.additions and added to
      * changes.renames.
      */
-    static void optimizeForRenames(FileChanges& changes);
+    static void optimizeForRenames(FileChanges& changes, bool fastCompare);
     
     /**
      * Displays a spinner at the cursor, the spinner only updates every 200ms.

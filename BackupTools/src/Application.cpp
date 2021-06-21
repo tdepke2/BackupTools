@@ -94,7 +94,7 @@ void Application::printPaths(const fs::path& configFilename, bool verbose, bool 
     }
 }
 
-Application::FileChanges Application::checkBackup(const fs::path& configFilename, size_t outputLimit, bool displayConfirmation, bool quiet) {
+Application::FileChanges Application::checkBackup(const fs::path& configFilename, const BackupOptions& options) {
     FileChanges changes;
     std::map<fs::path, std::set<fs::path>> writePathsChecklist;    // Maps a destination path to the current contents of that path.
     auto lastWritePathIter = writePathsChecklist.end();
@@ -138,7 +138,7 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
         if (lastWritePathIter->second.erase(writePath) == 0) {    // Attempt to remove the write path from the checklist. If it's not found, then it doesn't currently exist and needs to be added.
             auto emplaceResult = changes.additions.emplace(readPath, writePath);
             assert(emplaceResult.second);
-        } else if (!FileHandler::checkFileEquivalence(readPath, writePath)) {    // If file exists but contents differ, it needs to be updated.
+        } else if (!FileHandler::checkFileEquivalence(readPath, writePath, options.fastCompare)) {    // If file exists but contents differ, it needs to be updated.
             auto emplaceResult = changes.modifications.emplace(readPath, writePath);
             assert(emplaceResult.second);
         }
@@ -168,11 +168,11 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     }
     writePathsChecklist.clear();
     
-    optimizeForRenames(changes);
+    optimizeForRenames(changes, options.fastCompare);
     
     std::cout << "Discovered " << scanCounter << " items.\n\n";    // Clear spinner and output scan totals.
-    if (!quiet) {
-        printChanges(changes, outputLimit, displayConfirmation);
+    if (!options.forceBackup) {
+        printChanges(changes, options.outputLimit, options.displayConfirmation);
     }
     return changes;
 }
@@ -270,12 +270,12 @@ void Application::printChanges(const FileChanges& changes, size_t outputLimit, b
     }
 }
 
-void Application::startBackup(const fs::path& configFilename, size_t outputLimit, bool forceBackup) {
-    FileChanges changes = checkBackup(configFilename, outputLimit, true, forceBackup);
+void Application::startBackup(const fs::path& configFilename, const BackupOptions& options) {
+    FileChanges changes = checkBackup(configFilename, options);
     if (changes.isEmpty()) {
         return;
     }
-    if (!forceBackup && !checkUserConfirmation()) {
+    if (!options.forceBackup && !checkUserConfirmation()) {
         std::cout << "\nBackup canceled.\n";
         return;
     }
@@ -319,8 +319,10 @@ void Application::startBackup(const fs::path& configFilename, size_t outputLimit
     printProgressBar(numCompleted, numOperations);
     std::cout << "File operations completed.\n";
     
-    if (!forceBackup) {
-        FileChanges changesAfter = checkBackup(configFilename, outputLimit, true, true);
+    if (!options.forceBackup) {
+        BackupOptions options2 = options;
+        options2.forceBackup = true;
+        FileChanges changesAfter = checkBackup(configFilename, options2);
         if (!changesAfter.isEmpty()) {
             std::cout << CSI::Yellow << "Warning: Found remaining changes after running backup. This may have been caused by an error during\n";
             std::cout << "file operations or recursive rules in the config file. Run \"check <config file>\" for more details." << CSI::Reset << "\n";
@@ -454,7 +456,7 @@ void Application::printTree2(const fs::path& searchPath, const std::map<fs::path
  * practice this works fine as the fs::rename() operation is designed to handle
  * this.
  */
-void Application::optimizeForRenames(FileChanges& changes) {
+void Application::optimizeForRenames(FileChanges& changes, bool fastCompare) {
     std::map<std::uintmax_t, std::set<fs::path>> deletionsFileSizes;    // Map file sizes to their paths for quick lookup of which files match the contents of a path.
     for (const auto& p : changes.deletions) {
         if (fs::is_regular_file(p)) {
@@ -468,7 +470,7 @@ void Application::optimizeForRenames(FileChanges& changes) {
             auto findResult = deletionsFileSizes.find(fs::file_size(additionsIter->first));
             if (findResult != deletionsFileSizes.end()) {    // If file matches size of one of the deleted ones, check if contents match.
                 for (auto deletionsSetIter = findResult->second.begin(); deletionsSetIter != findResult->second.end(); ++deletionsSetIter) {
-                    if (FileHandler::checkFileEquivalence(additionsIter->first, *deletionsSetIter)) {
+                    if (FileHandler::checkFileEquivalence(additionsIter->first, *deletionsSetIter, fastCompare)) {
                         changes.renames.emplace(*deletionsSetIter, additionsIter->second);    // Found a match, add it as a rename and remove the corresponding addition and deletion (subdirectories are not touched because fs::rename() expects existing directories).
                         auto deletionsIter = changes.deletions.find(*deletionsSetIter);
                         changes.deletions.erase(deletionsIter);

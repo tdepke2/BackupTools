@@ -3,8 +3,6 @@ Fixes:
 
 Additions:
     * Option to disable globbing entirely.
-    * Option to run backup in "fast" mode, only checks files based on modification date.
-        - Might be nice to add a new "set" flag for this too, the CLI args could be used to override this behavior though.
     * CMake build script.
     * Build and test on linux system.
     * Script to run automated backups (or at least instructions on how to set this up with cron job).

@@ -24,9 +24,11 @@ namespace fs = std::filesystem;
  * in the config.
  * 
  * The "limit" argument sets the max number of file operations to display for
- * each type, it does not effect any changes to files. The "force" argument
- * overrides the confirmation check and the second file check at the end, ideal
- * for automated backup purposes.
+ * each type, it does not effect any changes to files. The "fast-compare"
+ * argument skips binary file scans and only considers files as changed if their
+ * date-modified times differ. The "force" argument overrides the confirmation
+ * check and the second file check at the end, ideal for automated backup
+ * purposes.
  */
 void runCommandBackup(int argc, const char** argv) {
     if (argc < 3) {
@@ -35,9 +37,11 @@ void runCommandBackup(int argc, const char** argv) {
     fs::path configFilename = fs::path(argv[2]).lexically_normal();
     
     unsigned int outputLimit = 50;
+    int fastCompare = 0;
     int forceBackup = 0;
     ArgumentParser argParser({
         {'l', "limit", ArgumentParser::RequiredArg, nullptr, 'l'},
+        {'\0', "fast-compare", ArgumentParser::NoArg, &fastCompare, 1},
         {'f', "force", ArgumentParser::NoArg, &forceBackup, 1}
     });
     argParser.setArguments(argv, 3);
@@ -65,7 +69,13 @@ void runCommandBackup(int argc, const char** argv) {
     }
     
     Application app;
-    app.startBackup(configFilename, outputLimit, static_cast<bool>(forceBackup));
+    Application::BackupOptions options;
+    options.outputLimit = outputLimit;
+    options.displayConfirmation = true;
+    options.fastCompare = static_cast<bool>(fastCompare);
+    options.forceBackup = static_cast<bool>(forceBackup);
+    
+    app.startBackup(configFilename, options);
 }
 
 /**
@@ -80,7 +90,8 @@ void runCommandBackup(int argc, const char** argv) {
  * deletions (never renames) for simplicity.
  * 
  * The "limit" argument sets the max number of file operations to display for
- * each type.
+ * each type. The "fast-compare" argument skips binary file scans and only
+ * considers files as changed if their date-modified times differ.
  */
 void runCommandCheck(int argc, const char** argv) {
     if (argc < 3) {
@@ -89,8 +100,10 @@ void runCommandCheck(int argc, const char** argv) {
     fs::path configFilename = fs::path(argv[2]).lexically_normal();
     
     unsigned int outputLimit = 50;
+    int fastCompare = 0;
     ArgumentParser argParser({
-        {'l', "limit", ArgumentParser::RequiredArg, nullptr, 'l'}
+        {'l', "limit", ArgumentParser::RequiredArg, nullptr, 'l'},
+        {'\0', "fast-compare", ArgumentParser::NoArg, &fastCompare, 1}
     });
     argParser.setArguments(argv, 3);
     
@@ -117,7 +130,13 @@ void runCommandCheck(int argc, const char** argv) {
     }
     
     Application app;
-    app.checkBackup(configFilename, outputLimit);
+    Application::BackupOptions options;
+    options.outputLimit = outputLimit;
+    options.displayConfirmation = false;
+    options.fastCompare = static_cast<bool>(fastCompare);
+    options.forceBackup = false;
+    
+    app.checkBackup(configFilename, options);
 }
 
 /**
@@ -288,10 +307,12 @@ void showHelp() {
     std::cout << "Commands:\n";
     std::cout << "  backup <CONFIG FILE> [OPTION]    Starts a backup/restore of files.\n";
     std::cout << "    -l, --limit N                      Limits output to N lines (50 by default). Use negative value for no limit.\n";
+    std::cout << "    --fast-compare                     Only considers modification timestamp when checking files (no binary scan).\n";
     std::cout << "    -f, --force                        Forces backup to run without confirmation check.\n";
     std::cout << "\n";
     std::cout << "  check <CONFIG FILE> [OPTION]     Lists changes to make during backup.\n";
     std::cout << "    -l, --limit N                      Limits output to N lines (50 by default). Use negative value for no limit.\n";
+    std::cout << "    --fast-compare                     Only considers modification timestamp when checking files (no binary scan).\n";
     std::cout << "\n";
     std::cout << "  tree <CONFIG FILE> [OPTION]      Displays tree of tracked files.\n";
     std::cout << "    -c, --count                        Only display the total count.\n";

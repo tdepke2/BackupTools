@@ -1,6 +1,7 @@
 #include "FileHandler.h"
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <iostream>
 #include <limits>
 #include <numeric>
@@ -195,7 +196,23 @@ bool FileHandler::containsWildcard(char const* pattern) {
     return false;
 }
 
-bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& dest) {    // Based on https://stackoverflow.com/questions/15118661/in-c-whats-the-fastest-way-to-tell-whether-two-string-or-binary-files-are-di
+/**
+ * Based on https://stackoverflow.com/questions/15118661/in-c-whats-the-fastest-way-to-tell-whether-two-string-or-binary-files-are-di
+ */
+bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& dest, bool fastCompare) {
+    if (fastCompare) {
+        fs::file_status sourceStatus = fs::status(source);
+        fs::file_status destStatus = fs::status(dest);
+        if (!fs::exists(sourceStatus) || !fs::exists(destStatus)) {
+            return false;
+        } else if (fs::is_directory(sourceStatus) || fs::is_directory(destStatus)) {
+            return fs::is_directory(sourceStatus) && fs::is_directory(destStatus) && source.filename() == dest.filename();
+        } else {
+            auto writeTimeDifference = std::chrono::duration_cast<std::chrono::milliseconds>(fs::last_write_time(source) - fs::last_write_time(dest)).count();
+            return std::abs(writeTimeDifference) < 2000;    // Consider the files as identical if the modification timestamps are less than 2 seconds.
+        }
+    }
+    
     std::ifstream sourceFile(source, std::ios::ate | std::ios::binary);    // Open files in binary mode and seek to end.
     std::ifstream destFile(dest, std::ios::ate | std::ios::binary);
     if (!sourceFile.is_open() || !destFile.is_open()) {
