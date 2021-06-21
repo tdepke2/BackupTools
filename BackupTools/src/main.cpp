@@ -9,10 +9,6 @@
 #include <string>
 #include <vector>
 
-// Quick desc:
-// CLI backup tool ideal for backing up files to a flash drive. Target filename to include/exclude are stored in a config file.
-// Supports diff checking, manual backup, and automatic backups. Ideally should work on linux too, and use CMake and TDD.
-
 namespace fs = std::filesystem;
 
 /**

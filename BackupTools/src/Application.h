@@ -22,7 +22,7 @@ bool compareFileChange(const std::pair<fs::path, fs::path>& lhs, const std::pair
  * Contains the implementation for the CLI functions (backup, check, tree).
  */
 class Application {
-    public:
+public:
     /**
      * A transaction that keeps track of all the changes to make during a
      * backup. Uses a custom compare function to ignore case when sorting names
@@ -77,7 +77,7 @@ class Application {
      */
     void startBackup(const fs::path& configFilename, const BackupOptions& options);
     
-    private:
+private:
     /**
      * Used in printTree() to display totals at the end.
      */

@@ -19,7 +19,7 @@
  * these non-option arguments.
  */
 class ArgumentParser {
-    public:
+public:
     enum ArgumentType {
         NoArg, RequiredArg, OptionalArg
     };
@@ -80,7 +80,7 @@ class ArgumentParser {
      */
     int nextOption(std::string* errorMessagePtr = nullptr);
     
-    private:
+private:
     OptionList options_;
     const char** argv_;
     std::vector<const char*> nonOptionArguments_;

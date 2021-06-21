@@ -58,11 +58,11 @@ struct WriteReadPathTree {
 // May not want to use this in the end because of efficiency concerns, will leave it here if need to reconsider.
 
 class PathTreeNode {
-    public:
+public:
     PathTreeNode* getParent();
     PathTreeNode* addChild(const fs::path& subpath);
     
-    private:
+private:
     PathTreeNode* parent_;
     std::vector<PathTreeNode*> children_;
     fs::path subpath_;
@@ -71,11 +71,11 @@ class PathTreeNode {
 };
 
 class PathTree {
-    public:
+public:
     PathTree();
     PathTreeNode* getRoot();
     
-    private:
+private:
     PathTreeNode* root_;
 };
 */
@@ -90,7 +90,7 @@ bool compareFilename(const fs::path& lhs, const fs::path& rhs);
  * and other file operations.
  */
 class FileHandler {
-    public:
+public:
     static char pathSeparator;
     static bool globMatchesHiddenFiles;
     
@@ -176,7 +176,7 @@ class FileHandler {
      */
     bool checkPathIgnored(const fs::path& p) const;
     
-    private:
+private:
     std::ifstream configFile_;
     fs::path configFilename_;
     unsigned int lineNumber_;
