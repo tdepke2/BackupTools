@@ -2,7 +2,7 @@ Fixes:
     * Comments could use some work, maybe try doxygen standard?
 
 Additions:
-    * Option to disable globbing entirely.
+    * Generate cache files to keep track of which files have been scanned already. File modified time is noted.
     * CMake build script.
     * Build and test on linux system.
     * Script to run automated backups (or at least instructions on how to set this up with cron job).

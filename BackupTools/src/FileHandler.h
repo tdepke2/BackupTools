@@ -92,6 +92,7 @@ bool compareFilename(const fs::path& lhs, const fs::path& rhs);
 class FileHandler {
 public:
     static char pathSeparator;
+    static bool globMatching;
     static bool globMatchesHiddenFiles;
     
     /**

@@ -9,6 +9,7 @@
 #include <stdexcept>
 
 char FileHandler::pathSeparator = fs::path::preferred_separator;
+bool FileHandler::globMatching = true;
 bool FileHandler::globMatchesHiddenFiles = true;
 
 std::ostream& operator<<(std::ostream& out, CSI csiCode) {
@@ -25,7 +26,9 @@ bool compareFilename(const fs::path& lhs, const fs::path& rhs) {
     return std::tolower(static_cast<unsigned char>(lhsString[i])) < std::tolower(static_cast<unsigned char>(rhsString[i]));
 }
 
-// Helper function for fnmatchSimple().
+/**
+ * Helper function for fnmatchSimple().
+ */
 bool fnmatchSimple_(char const* pattern, char const* str) {
     while (*str != '\0' && *str != FileHandler::pathSeparator) {
         if (*pattern == '*') {    // Star matches zero to n characters. Does not match a leading dot in a name.
@@ -123,10 +126,23 @@ bool fnmatchSimple_(char const* pattern, char const* str) {
     return *pattern == '\0' || *pattern == FileHandler::pathSeparator;
 }
 
-// Alternative fnmatch version for cases with either no path separators, or path separators only at the end of pattern and str. Called by fnmatchPortable().
+/**
+ * Alternative fnmatch version for cases with either no path separators, or path
+ * separators only at the end of pattern and str. Called by fnmatchPortable().
+ */
 bool fnmatchSimple(char const* pattern, char const* str, bool matchAllPaths = false) {
     if (matchAllPaths) {
         return (FileHandler::globMatchesHiddenFiles || *str != '.');
+    } else if (!FileHandler::globMatching) {    // If no glob matching, just compare the strings directly.
+        while (*str != '\0' && *str != FileHandler::pathSeparator) {
+            if (*pattern != *str) {
+                return false;
+            }
+            ++pattern;
+            ++str;
+        }
+        
+        return *pattern == '\0' || *pattern == FileHandler::pathSeparator;
     }
     
     // Star does not match a leading dot in a name (because it's not supposed to match hidden files or the . and .. directories). Question mark does not match a leading dot in a name.
@@ -348,6 +364,7 @@ void FileHandler::loadConfigFile(const fs::path& filename) {
         throw std::runtime_error("\"" + filename.string() + "\": Unable to open file for reading.");
     }
     
+    globMatching = true;
     globMatchesHiddenFiles = true;
     
     configFilename_ = filename;
@@ -419,7 +436,7 @@ std::pair<fs::path, std::vector<fs::path>> FileHandler::globPortable(fs::path pa
         pattern = (fs::current_path() / pattern).lexically_normal();
     }
     bool addedTrailingGlobstar = false;
-    if (!containsWildcard(pattern.filename().string().c_str())) {    // If last sub-path is not a glob, assume it is a directory and match contents recursively.
+    if (!containsWildcard(pattern.filename().string().c_str()) || !globMatching) {    // If last sub-path is not a glob, assume it is a directory and match contents recursively.
         pattern /= "**";
         addedTrailingGlobstar = true;
     }
@@ -643,7 +660,13 @@ void FileHandler::parseNextLineInFile() {
                 throw std::runtime_error("Missing option parameter.");
             }
             std::string option = parseNextWord(index, line);
-            if (option == "match-hidden") {    // Controls matching of hidden files when using wildcard matching.
+            
+            if (option == "glob-matching") {    // Enables/disables glob (wildcard) matching.
+                if (index >= line.length()) {
+                    throw std::runtime_error("Missing value for \"" + option + "\".");
+                }
+                globMatching = parseNextBool(index, line);
+            } else if (option == "match-hidden") {    // Controls matching of hidden files when using glob matching.
                 if (index >= line.length()) {
                     throw std::runtime_error("Missing value for \"" + option + "\".");
                 }

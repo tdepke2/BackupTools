@@ -324,7 +324,9 @@ void showHelp() {
 
 void showConfigHelp() {
     std::cout << R"RAW_STRING(
-# Configuration files documentation (last updated on 05/31/2021).
+################################################################################
+# Configuration files documentation (last updated on 06/23/2021).              #
+################################################################################
 
 
 # Comments begin with a # symbol. They must be on their own line (only
@@ -386,18 +388,29 @@ void showConfigHelp() {
 # program after reaching this point. A variable can be set to something else at
 # a later time. Currently supported variables are:
 # 
+# glob-matching <true/false>
+#     Enables/disables glob matching. If this is set to true, all of the details
+#     discussed in the previous section about glob matching will be in effect.
+#     For technical reasons, the double astrisk "**" pattern can still be used
+#     if glob matching is disabled.
+#     
+#     Default is true (globbing enabled).
+# 
 # match-hidden <true/false>
 #     Controls glob matching of hidden items (any file or directory that begins
 #     with a . character). The default behavior in UNIX systems is to skip
-#     files/directories beginning with a dot that are matched by a glob (a
-#     wildcard pattern, such as a filename containing the * or ? characters).
+#     files/directories beginning with a dot that are matched by a glob pattern.
 #     This variable can be used to match that behavior if desired.
 #     
 #     Note that this only affects glob patterns, a filename that explicitly
 #     contains a leading dot will not be affected. This also does not behave
 #     like the "ignore" keyword, a hidden file that does not match in the source
 #     area will be checked to not exist at the destination.
+#     
 #     Default is true (match everything).
+
+# This will disable glob patterns.
+set glob-matching false
 
 # This will skip tracking of hidden files/folders.
 set match-hidden false
