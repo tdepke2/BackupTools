@@ -218,7 +218,7 @@ private:
     std::set<fs::path> previousReadPaths_;
     fs::path writePath_, readPath_;
     bool writePathSet_, readPathSet_;
-    std::map<fs::path, CachedWriteTime> cachedWriteTimes_;    // May be a good idea to use a radix tree instead of std::map, but also good to stick with simplicity. ###############################################
+    std::map<fs::path, CachedWriteTime> cachedWriteTimes_;
     
     /**
      * Determines if the current sub-path is ignored given the current position

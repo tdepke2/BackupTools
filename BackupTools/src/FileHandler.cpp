@@ -361,7 +361,6 @@ bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& d
         }
     }
     if (!skipCache) {
-        std::cout << "Updated cache entry for \"" << source.string() << "\".\n";  // REMOVE ####################################
         lastWriteTime->second.sourceTime = fs::last_write_time(source);
         lastWriteTime->second.destTime = fs::last_write_time(dest);
         lastWriteTime->second.fileEquivalence = equalResult;
@@ -408,32 +407,17 @@ bool FileHandler::loadCacheFile(const fs::path& filename, const fs::file_time_ty
     }
     
     char buf[4097];    // Maximum path names are around 255 to 4096 characters on most systems.
-    //fs::file_time_type::duration::rep sourceTime, destTime;
     CachedWriteTime cachedWriteTime;
-    int i = 0;
     while (true) {
         cacheFile.getline(buf, sizeof(buf), '\0');
         if (cacheFile.eof()) {
             break;
         }
-        //cacheFile.read(reinterpret_cast<char*>(&sourceTime), sizeof(sourceTime));
-        //cacheFile.get();
-        //cacheFile.read(reinterpret_cast<char*>(&destTime), sizeof(destTime));
-        
         cacheFile.read(reinterpret_cast<char*>(&cachedWriteTime), sizeof(cachedWriteTime));
         cacheFile.get();
         
-        
-        //fs::file_time_type a{fs::file_time_type::duration{sourceTime}};
-        //fs::file_time_type b{fs::file_time_type::duration{destTime}};
-        
-        //if (i < 8) {
-            //std::cout << "Dat is [" << buf << "], " << cachedWriteTime.sourceTime.time_since_epoch().count() << ", " << cachedWriteTime.destTime.time_since_epoch().count() << ", " << cachedWriteTime.fileEquivalence << "\n";
-        //}
         cachedWriteTimes_.insert({fs::path(buf), cachedWriteTime});
-        ++i;
     }
-    std::cout << "Load done, total entries is " << i << "\n";
     cacheFile.close();
     return true;
 }
@@ -444,29 +428,16 @@ void FileHandler::saveCacheFile(const fs::path& filename, const fs::file_time_ty
         throw std::runtime_error("\"" + filename.string() + "\": Unable to open file for writing.");
     }
     
+    // For NTFS, size of the file modified timestamp is 8 bytes.
     cacheFile.write(reinterpret_cast<const char*>(&configFileWriteTime), sizeof(configFileWriteTime));    // File begins with timestamp of the config file.
     cacheFile.put('\n');
-    int i = 0;
+    
     for (const auto& x : cachedWriteTimes_) {
-        // For NTFS, size of the file modified timestamp is 8 bytes.
         cacheFile.write(x.first.string().c_str(), x.first.string().length());    // Write source filename and null character.
         cacheFile.put('\0');
-        auto sourceTime = x.second.sourceTime.time_since_epoch().count();
-        //cacheFile.write(reinterpret_cast<char*>(&sourceTime), sizeof(sourceTime));
-        //cacheFile.put('\0');
-        auto destTime = x.second.destTime.time_since_epoch().count();
-        //cacheFile.write(reinterpret_cast<char*>(&destTime), sizeof(destTime));
-        //cacheFile.put('\0');
-        //cacheFile.put('\0');
         cacheFile.write(reinterpret_cast<const char*>(&x.second), sizeof(x.second));    // Write contents of the CachedWriteTime.
         cacheFile.put('\n');
-        
-        //if (i < 8) {
-            //std::cout << "Dat is [" << x.first.string() << "], " << sourceTime << ", " << destTime << ", " << x.second.fileEquivalence << "\n";
-        //}
-        ++i;
     }
-    std::cout << "Save done, total entries is " << i << "\n";
     cacheFile.close();
 }
 
