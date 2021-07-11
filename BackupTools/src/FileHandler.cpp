@@ -357,7 +357,7 @@ bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& d
             std::istreambuf_iterator<char> sourceIter(sourceFile);
             std::istreambuf_iterator<char> destIter(destFile);
             
-            bool equalResult = std::equal(sourceIter, std::istreambuf_iterator<char>(), destIter);    // Compare streams to check for equality (both streams are same length so this is safe).
+            equalResult = std::equal(sourceIter, std::istreambuf_iterator<char>(), destIter);    // Compare streams to check for equality (both streams are same length so this is safe).
         }
     }
     if (!skipCache) {
@@ -392,7 +392,7 @@ void FileHandler::loadConfigFile(const fs::path& filename) {
     readPathSet_ = false;
 }
 
-void FileHandler::loadCacheFile(const fs::path& filename) {
+bool FileHandler::loadCacheFile(const fs::path& filename, const fs::file_time_type& configFileWriteTime) {
     cachedWriteTimes_.clear();
     
     std::ifstream cacheFile(filename, std::ios::binary);
@@ -400,10 +400,16 @@ void FileHandler::loadCacheFile(const fs::path& filename) {
         throw std::runtime_error("\"" + filename.string() + "\": Unable to open file for reading.");
     }
     
+    fs::file_time_type lastKnownWriteTime;
+    cacheFile.read(reinterpret_cast<char*>(&lastKnownWriteTime), sizeof(lastKnownWriteTime));
+    cacheFile.get();
+    if (lastKnownWriteTime != configFileWriteTime) {
+        return false;
+    }
+    
     char buf[4097];    // Maximum path names are around 255 to 4096 characters on most systems.
     //fs::file_time_type::duration::rep sourceTime, destTime;
     CachedWriteTime cachedWriteTime;
-    
     int i = 0;
     while (true) {
         cacheFile.getline(buf, sizeof(buf), '\0');
@@ -429,20 +435,21 @@ void FileHandler::loadCacheFile(const fs::path& filename) {
     }
     std::cout << "Load done, total entries is " << i << "\n";
     cacheFile.close();
+    return true;
 }
 
-void FileHandler::saveCacheFile(const fs::path& filename) {
+void FileHandler::saveCacheFile(const fs::path& filename, const fs::file_time_type& configFileWriteTime) {
     std::ofstream cacheFile(filename, std::ios::binary);
     if (!cacheFile.is_open()) {
         throw std::runtime_error("\"" + filename.string() + "\": Unable to open file for writing.");
     }
     
-    // TODO: probably a good idea to include timestamp of the config file as the first line in file and verify that it matches. ##############################################################
-    
+    cacheFile.write(reinterpret_cast<const char*>(&configFileWriteTime), sizeof(configFileWriteTime));    // File begins with timestamp of the config file.
+    cacheFile.put('\n');
     int i = 0;
     for (const auto& x : cachedWriteTimes_) {
         // For NTFS, size of the file modified timestamp is 8 bytes.
-        cacheFile.write(x.first.string().c_str(), x.first.string().length());
+        cacheFile.write(x.first.string().c_str(), x.first.string().length());    // Write source filename and null character.
         cacheFile.put('\0');
         auto sourceTime = x.second.sourceTime.time_since_epoch().count();
         //cacheFile.write(reinterpret_cast<char*>(&sourceTime), sizeof(sourceTime));
@@ -451,7 +458,7 @@ void FileHandler::saveCacheFile(const fs::path& filename) {
         //cacheFile.write(reinterpret_cast<char*>(&destTime), sizeof(destTime));
         //cacheFile.put('\0');
         //cacheFile.put('\0');
-        cacheFile.write(reinterpret_cast<const char*>(&x.second), sizeof(x.second));
+        cacheFile.write(reinterpret_cast<const char*>(&x.second), sizeof(x.second));    // Write contents of the CachedWriteTime.
         cacheFile.put('\n');
         
         //if (i < 8) {

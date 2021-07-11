@@ -102,9 +102,13 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     fileHandler.loadConfigFile(configFilename);
     
     fs::path cacheFilePath(".backuptools/" + configFilename.string() + ".cache");
+    fs::file_time_type configFileWriteTime = fs::last_write_time(configFilename);
     if (!options.skipCache && fs::exists(cacheFilePath)) {
-        std::cout << "Parsing cache file...\n";
-        fileHandler.loadCacheFile(cacheFilePath);
+        std::cout << "Parsing cache file...";
+        if (!fileHandler.loadCacheFile(cacheFilePath, configFileWriteTime)) {
+            std::cout << " Canceled (config file was updated).";
+        }
+        std::cout << "\n";
     }
     
     int spinnerIndex = 0;
@@ -178,7 +182,7 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     
     if (!options.skipCache) {
         fs::create_directory(cacheFilePath.parent_path());
-        fileHandler.saveCacheFile(cacheFilePath);
+        fileHandler.saveCacheFile(cacheFilePath, configFileWriteTime);
     }
     
     std::cout << "Discovered " << scanCounter << " items.\n\n";    // Clear spinner and output scan totals.

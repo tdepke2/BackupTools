@@ -159,13 +159,17 @@ public:
      * destination files, and whether the files were equivalent or not at that
      * time. The file format is filename (of source), null character, the byte
      * data of the corresponding CachedWriteTime, and a newline character.
+     * 
+     * The configFileWriteTime parameter is the file modification timestamp of
+     * the config file that this cache file corresponds to. It's used to verify
+     * if the cache file is up-to-date and skips parsing if not.
      */
-    void loadCacheFile(const fs::path& filename);
+    bool loadCacheFile(const fs::path& filename, const fs::file_time_type& configFileWriteTime);
     
     /**
      * Creates a cache file using the format mentioned in loadCacheFile().
      */
-    void saveCacheFile(const fs::path& filename);
+    void saveCacheFile(const fs::path& filename, const fs::file_time_type& configFileWriteTime);
     
     /**
      * Get the next set of write/read paths from configFile_, or return empty
