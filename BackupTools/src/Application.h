@@ -46,6 +46,7 @@ public:
     struct BackupOptions {
         size_t outputLimit;
         bool displayConfirmation;
+        bool skipCache;
         bool fastCompare;
         bool forceBackup;
     };
@@ -114,7 +115,7 @@ private:
      * paths are removed from changes.deletions/changes.additions and added to
      * changes.renames.
      */
-    static void optimizeForRenames(FileChanges& changes, bool fastCompare);
+    static void optimizeForRenames(FileHandler& fileHandler, FileChanges& changes, bool skipCache, bool fastCompare);
     
     /**
      * Displays a spinner at the cursor, the spinner only updates every 200ms.

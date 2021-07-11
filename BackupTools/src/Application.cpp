@@ -101,6 +101,12 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     FileHandler fileHandler;
     fileHandler.loadConfigFile(configFilename);
     
+    fs::path cacheFilePath(".backuptools/" + configFilename.string() + ".cache");
+    if (!options.skipCache && fs::exists(cacheFilePath)) {
+        std::cout << "Parsing cache file...\n";
+        fileHandler.loadCacheFile(cacheFilePath);
+    }
+    
     int spinnerIndex = 0;
     std::chrono::steady_clock::time_point spinnerLastTime = std::chrono::steady_clock::now();
     std::cout << "Scanning for changes...\n";
@@ -138,7 +144,7 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
         if (lastWritePathIter->second.erase(writePath) == 0) {    // Attempt to remove the write path from the checklist. If it's not found, then it doesn't currently exist and needs to be added.
             auto emplaceResult = changes.additions.emplace(readPath, writePath);
             assert(emplaceResult.second);
-        } else if (!FileHandler::checkFileEquivalence(readPath, writePath, options.fastCompare)) {    // If file exists but contents differ, it needs to be updated.
+        } else if (!fileHandler.checkFileEquivalence(readPath, writePath, options.skipCache, options.fastCompare)) {    // If file exists but contents differ, it needs to be updated.
             auto emplaceResult = changes.modifications.emplace(readPath, writePath);
             assert(emplaceResult.second);
         }
@@ -168,12 +174,18 @@ Application::FileChanges Application::checkBackup(const fs::path& configFilename
     }
     writePathsChecklist.clear();
     
-    optimizeForRenames(changes, options.fastCompare);
+    optimizeForRenames(fileHandler, changes, options.skipCache, options.fastCompare);
+    
+    if (!options.skipCache) {
+        fs::create_directory(cacheFilePath.parent_path());
+        fileHandler.saveCacheFile(cacheFilePath);
+    }
     
     std::cout << "Discovered " << scanCounter << " items.\n\n";    // Clear spinner and output scan totals.
     if (!options.forceBackup) {
         printChanges(changes, options.outputLimit, options.displayConfirmation);
     }
+    
     return changes;
 }
 
@@ -456,7 +468,7 @@ void Application::printTree2(const fs::path& searchPath, const std::map<fs::path
  * practice this works fine as the fs::rename() operation is designed to handle
  * this.
  */
-void Application::optimizeForRenames(FileChanges& changes, bool fastCompare) {
+void Application::optimizeForRenames(FileHandler& fileHandler, FileChanges& changes, bool skipCache, bool fastCompare) {
     std::map<std::uintmax_t, std::set<fs::path>> deletionsFileSizes;    // Map file sizes to their paths for quick lookup of which files match the contents of a path.
     for (const auto& p : changes.deletions) {
         if (fs::is_regular_file(p)) {
@@ -470,7 +482,7 @@ void Application::optimizeForRenames(FileChanges& changes, bool fastCompare) {
             auto findResult = deletionsFileSizes.find(fs::file_size(additionsIter->first));
             if (findResult != deletionsFileSizes.end()) {    // If file matches size of one of the deleted ones, check if contents match.
                 for (auto deletionsSetIter = findResult->second.begin(); deletionsSetIter != findResult->second.end(); ++deletionsSetIter) {
-                    if (FileHandler::checkFileEquivalence(additionsIter->first, *deletionsSetIter, fastCompare)) {
+                    if (fileHandler.checkFileEquivalence(additionsIter->first, *deletionsSetIter, skipCache, fastCompare)) {
                         changes.renames.emplace(*deletionsSetIter, additionsIter->second);    // Found a match, add it as a rename and remove the corresponding addition and deletion (subdirectories are not touched because fs::rename() expects existing directories).
                         auto deletionsIter = changes.deletions.find(*deletionsSetIter);
                         changes.deletions.erase(deletionsIter);

@@ -212,47 +212,6 @@ bool FileHandler::containsWildcard(char const* pattern) {
     return false;
 }
 
-/**
- * Based on https://stackoverflow.com/questions/15118661/in-c-whats-the-fastest-way-to-tell-whether-two-string-or-binary-files-are-di
- */
-bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& dest, bool fastCompare) {
-    if (fastCompare) {
-        fs::file_status sourceStatus = fs::status(source);
-        fs::file_status destStatus = fs::status(dest);
-        if (!fs::exists(sourceStatus) || !fs::exists(destStatus)) {
-            return false;
-        } else if (fs::is_directory(sourceStatus) || fs::is_directory(destStatus)) {
-            return fs::is_directory(sourceStatus) && fs::is_directory(destStatus) && source.filename() == dest.filename();
-        } else {
-            auto writeTimeDifference = std::chrono::duration_cast<std::chrono::milliseconds>(fs::last_write_time(source) - fs::last_write_time(dest)).count();
-            return std::abs(writeTimeDifference) < 2000;    // Consider the files as identical if the modification timestamps are less than 2 seconds.
-        }
-    }
-    
-    std::ifstream sourceFile(source, std::ios::ate | std::ios::binary);    // Open files in binary mode and seek to end.
-    std::ifstream destFile(dest, std::ios::ate | std::ios::binary);
-    if (!sourceFile.is_open() || !destFile.is_open()) {
-        if (fs::is_directory(source) && fs::is_directory(dest) && source.filename() == dest.filename()) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-    const std::ios::pos_type sourceSize = sourceFile.tellg();    // Find file sizes.
-    const std::ios::pos_type destSize = destFile.tellg();
-    if (sourceSize != destSize) {
-        return false;
-    }
-    
-    sourceFile.seekg(0);    // Return to beginning of files.
-    destFile.seekg(0);
-    
-    std::istreambuf_iterator<char> sourceIter(sourceFile);
-    std::istreambuf_iterator<char> destIter(destFile);
-    
-    return std::equal(sourceIter, std::istreambuf_iterator<char>(), destIter);    // Compare streams to check for equality (both streams are same length so this is safe).
-}
-
 void FileHandler::skipWhitespace(std::string::size_type& index, const std::string& str) {
     while (index < str.length() && str[index] == ' ') {
         ++index;
@@ -355,6 +314,61 @@ bool FileHandler::parseNextBool(std::string::size_type& index, const std::string
     return b;
 }
 
+bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& dest, bool skipCache, bool fastCompare) {
+    fs::file_status sourceStatus = fs::status(source);
+    fs::file_status destStatus = fs::status(dest);
+    if (!fs::exists(sourceStatus) || !fs::exists(destStatus)) {
+        return false;
+    } else if (fs::is_directory(sourceStatus) || fs::is_directory(destStatus)) {
+        return fs::is_directory(sourceStatus) && fs::is_directory(destStatus) && source.filename() == dest.filename();
+    }
+    
+    if (fastCompare) {
+        auto writeTimeDifference = std::chrono::duration_cast<std::chrono::milliseconds>(fs::last_write_time(source) - fs::last_write_time(dest)).count();
+        return std::abs(writeTimeDifference) < 2000;    // Consider the files as identical if the modification timestamps are less than 2 seconds.
+    }
+    
+    std::map<fs::path, CachedWriteTime>::iterator lastWriteTime;
+    if (!skipCache) {
+        lastWriteTime = cachedWriteTimes_.find(source);
+        if (lastWriteTime != cachedWriteTimes_.end()) {
+            if (lastWriteTime->second.sourceTime == fs::last_write_time(source) && lastWriteTime->second.destTime == fs::last_write_time(dest)) {    // Check if the write time of both files stayed the same.
+                return lastWriteTime->second.fileEquivalence;
+            }
+        } else {
+            lastWriteTime = cachedWriteTimes_.insert({source, {}}).first;
+        }
+    }
+    
+    // This part based on: https://stackoverflow.com/questions/15118661/in-c-whats-the-fastest-way-to-tell-whether-two-string-or-binary-files-are-di
+    bool equalResult = false;
+    std::ifstream sourceFile(source, std::ios::ate | std::ios::binary);    // Open files in binary mode and seek to end.
+    std::ifstream destFile(dest, std::ios::ate | std::ios::binary);
+    
+    if (sourceFile.is_open() && destFile.is_open()) {
+        // TODO: may want to merge these two if statements if tellg can work on closed files. ##########################################################################
+        const std::ios::pos_type sourceSize = sourceFile.tellg();    // Find file sizes.
+        const std::ios::pos_type destSize = destFile.tellg();
+        
+        if (sourceSize == destSize) {
+            sourceFile.seekg(0);    // Return to beginning of files.
+            destFile.seekg(0);
+            
+            std::istreambuf_iterator<char> sourceIter(sourceFile);
+            std::istreambuf_iterator<char> destIter(destFile);
+            
+            bool equalResult = std::equal(sourceIter, std::istreambuf_iterator<char>(), destIter);    // Compare streams to check for equality (both streams are same length so this is safe).
+        }
+    }
+    if (!skipCache) {
+        std::cout << "Updated cache entry for \"" << source.string() << "\".\n";  // REMOVE ####################################
+        lastWriteTime->second.sourceTime = fs::last_write_time(source);
+        lastWriteTime->second.destTime = fs::last_write_time(dest);
+        lastWriteTime->second.fileEquivalence = equalResult;
+    }
+    return equalResult;
+}
+
 void FileHandler::loadConfigFile(const fs::path& filename) {
     if (configFile_.is_open()) {
         configFile_.close();
@@ -372,12 +386,81 @@ void FileHandler::loadConfigFile(const fs::path& filename) {
     rootPaths_.clear();
     ignorePaths_.clear();
     previousReadPaths_.clear();
-    globPortableResults_.clear();
-    globPortableResultsIndex_ = 0;
     writePath_.clear();
     readPath_.clear();
     writePathSet_ = false;
     readPathSet_ = false;
+}
+
+void FileHandler::loadCacheFile(const fs::path& filename) {
+    cachedWriteTimes_.clear();
+    
+    std::ifstream cacheFile(filename, std::ios::binary);
+    if (!cacheFile.is_open()) {
+        throw std::runtime_error("\"" + filename.string() + "\": Unable to open file for reading.");
+    }
+    
+    char buf[4097];    // Maximum path names are around 255 to 4096 characters on most systems.
+    //fs::file_time_type::duration::rep sourceTime, destTime;
+    CachedWriteTime cachedWriteTime;
+    
+    int i = 0;
+    while (true) {
+        cacheFile.getline(buf, sizeof(buf), '\0');
+        if (cacheFile.eof()) {
+            break;
+        }
+        //cacheFile.read(reinterpret_cast<char*>(&sourceTime), sizeof(sourceTime));
+        //cacheFile.get();
+        //cacheFile.read(reinterpret_cast<char*>(&destTime), sizeof(destTime));
+        
+        cacheFile.read(reinterpret_cast<char*>(&cachedWriteTime), sizeof(cachedWriteTime));
+        cacheFile.get();
+        
+        
+        //fs::file_time_type a{fs::file_time_type::duration{sourceTime}};
+        //fs::file_time_type b{fs::file_time_type::duration{destTime}};
+        
+        //if (i < 8) {
+            //std::cout << "Dat is [" << buf << "], " << cachedWriteTime.sourceTime.time_since_epoch().count() << ", " << cachedWriteTime.destTime.time_since_epoch().count() << ", " << cachedWriteTime.fileEquivalence << "\n";
+        //}
+        cachedWriteTimes_.insert({fs::path(buf), cachedWriteTime});
+        ++i;
+    }
+    std::cout << "Load done, total entries is " << i << "\n";
+    cacheFile.close();
+}
+
+void FileHandler::saveCacheFile(const fs::path& filename) {
+    std::ofstream cacheFile(filename, std::ios::binary);
+    if (!cacheFile.is_open()) {
+        throw std::runtime_error("\"" + filename.string() + "\": Unable to open file for writing.");
+    }
+    
+    // TODO: probably a good idea to include timestamp of the config file as the first line in file and verify that it matches. ##############################################################
+    
+    int i = 0;
+    for (const auto& x : cachedWriteTimes_) {
+        // For NTFS, size of the file modified timestamp is 8 bytes.
+        cacheFile.write(x.first.string().c_str(), x.first.string().length());
+        cacheFile.put('\0');
+        auto sourceTime = x.second.sourceTime.time_since_epoch().count();
+        //cacheFile.write(reinterpret_cast<char*>(&sourceTime), sizeof(sourceTime));
+        //cacheFile.put('\0');
+        auto destTime = x.second.destTime.time_since_epoch().count();
+        //cacheFile.write(reinterpret_cast<char*>(&destTime), sizeof(destTime));
+        //cacheFile.put('\0');
+        //cacheFile.put('\0');
+        cacheFile.write(reinterpret_cast<const char*>(&x.second), sizeof(x.second));
+        cacheFile.put('\n');
+        
+        //if (i < 8) {
+            //std::cout << "Dat is [" << x.first.string() << "], " << sourceTime << ", " << destTime << ", " << x.second.fileEquivalence << "\n";
+        //}
+        ++i;
+    }
+    std::cout << "Save done, total entries is " << i << "\n";
+    cacheFile.close();
 }
 
 WriteReadPathTree FileHandler::nextWriteReadPathTree() {

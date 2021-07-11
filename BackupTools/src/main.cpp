@@ -20,7 +20,9 @@ namespace fs = std::filesystem;
  * in the config.
  * 
  * The "limit" argument sets the max number of file operations to display for
- * each type, it does not effect any changes to files. The "fast-compare"
+ * each type, it does not effect any changes to files. The "skip-cache" argument
+ * avoids usage of the cache file that normally keeps track of which files have
+ * changed, using this option may reduce performance. The "fast-compare"
  * argument skips binary file scans and only considers files as changed if their
  * date-modified times differ. The "force" argument overrides the confirmation
  * check and the second file check at the end, ideal for automated backup
@@ -33,10 +35,12 @@ void runCommandBackup(int argc, const char** argv) {
     fs::path configFilename = fs::path(argv[2]).lexically_normal();
     
     unsigned int outputLimit = 50;
+    int skipCache = 0;
     int fastCompare = 0;
     int forceBackup = 0;
     ArgumentParser argParser({
         {'l', "limit", ArgumentParser::RequiredArg, nullptr, 'l'},
+        {'\0', "skip-cache", ArgumentParser::NoArg, &skipCache, 1},
         {'\0', "fast-compare", ArgumentParser::NoArg, &fastCompare, 1},
         {'f', "force", ArgumentParser::NoArg, &forceBackup, 1}
     });
@@ -68,6 +72,7 @@ void runCommandBackup(int argc, const char** argv) {
     Application::BackupOptions options;
     options.outputLimit = outputLimit;
     options.displayConfirmation = true;
+    options.skipCache = static_cast<bool>(skipCache);
     options.fastCompare = static_cast<bool>(fastCompare);
     options.forceBackup = static_cast<bool>(forceBackup);
     
@@ -86,8 +91,11 @@ void runCommandBackup(int argc, const char** argv) {
  * deletions (never renames) for simplicity.
  * 
  * The "limit" argument sets the max number of file operations to display for
- * each type. The "fast-compare" argument skips binary file scans and only
- * considers files as changed if their date-modified times differ.
+ * each type, it does not effect any changes to files. The "skip-cache" argument
+ * avoids usage of the cache file that normally keeps track of which files have
+ * changed, using this option may reduce performance. The "fast-compare"
+ * argument skips binary file scans and only considers files as changed if their
+ * date-modified times differ.
  */
 void runCommandCheck(int argc, const char** argv) {
     if (argc < 3) {
@@ -96,9 +104,11 @@ void runCommandCheck(int argc, const char** argv) {
     fs::path configFilename = fs::path(argv[2]).lexically_normal();
     
     unsigned int outputLimit = 50;
+    int skipCache = 0;
     int fastCompare = 0;
     ArgumentParser argParser({
         {'l', "limit", ArgumentParser::RequiredArg, nullptr, 'l'},
+        {'\0', "skip-cache", ArgumentParser::NoArg, &skipCache, 1},
         {'\0', "fast-compare", ArgumentParser::NoArg, &fastCompare, 1}
     });
     argParser.setArguments(argv, 3);
@@ -129,6 +139,7 @@ void runCommandCheck(int argc, const char** argv) {
     Application::BackupOptions options;
     options.outputLimit = outputLimit;
     options.displayConfirmation = false;
+    options.skipCache = static_cast<bool>(skipCache);
     options.fastCompare = static_cast<bool>(fastCompare);
     options.forceBackup = false;
     
@@ -303,11 +314,13 @@ void showHelp() {
     std::cout << "Commands:\n";
     std::cout << "  backup <CONFIG FILE> [OPTION]    Starts a backup/restore of files.\n";
     std::cout << "    -l, --limit N                      Limits output to N lines (50 by default). Use negative value for no limit.\n";
+    std::cout << "    --skip-cache                       Skips reading/writing to cache file (tracks file modifications by timestamp).\n";
     std::cout << "    --fast-compare                     Only considers modification timestamp when checking files (no binary scan).\n";
     std::cout << "    -f, --force                        Forces backup to run without confirmation check.\n";
     std::cout << "\n";
     std::cout << "  check <CONFIG FILE> [OPTION]     Lists changes to make during backup.\n";
     std::cout << "    -l, --limit N                      Limits output to N lines (50 by default). Use negative value for no limit.\n";
+    std::cout << "    --skip-cache                       Skips reading/writing to cache file (tracks file modifications by timestamp).\n";
     std::cout << "    --fast-compare                     Only considers modification timestamp when checking files (no binary scan).\n";
     std::cout << "\n";
     std::cout << "  tree <CONFIG FILE> [OPTION]      Displays tree of tracked files.\n";

@@ -107,17 +107,6 @@ public:
     static bool containsWildcard(char const* pattern);
     
     /**
-     * Returns true if files are identical, false otherwise. Works with
-     * directories as well.
-     * 
-     * The fastCompare parameter skips the binary scan of each file and only
-     * returns true if the file modification timestamps match (if the times are
-     * within 2 seconds of each other to be exact, due to slightly different
-     * time representations across digital storage mediums).
-     */
-    static bool checkFileEquivalence(const fs::path& source, const fs::path& dest, bool fastCompare = false);
-    
-    /**
      * Increment index while space character found in str. Automatically called
      * at end of other parsing functions (unless an exception occurs).
      */
@@ -145,10 +134,38 @@ public:
     static bool parseNextBool(std::string::size_type& index, const std::string& str);
     
     /**
+     * Returns true if files are identical, false otherwise. Works with
+     * directories as well.
+     * 
+     * The skipCache parameter avoids reading/writing the cachedWriteTimes_ data
+     * that gets initialized from loadCacheFile().
+     * The fastCompare parameter skips the binary scan of each file and only
+     * returns true if the file modification timestamps match (if the times are
+     * within 2 seconds of each other to be exact, due to slightly different
+     * time representations across digital storage mediums).
+     */
+    bool checkFileEquivalence(const fs::path& source, const fs::path& dest, bool skipCache = false, bool fastCompare = false);
+    
+    /**
      * Opens the file (closes the previous one if still open) and resets all
      * internal state.
      */
     void loadConfigFile(const fs::path& filename);
+    
+    /**
+     * Parses a cache file and stores it in cachedWriteTimes_. The cache file
+     * keeps track of each file that gets scanned by checkFileEquivalence() and
+     * stores the last known modification timestamp of the source and
+     * destination files, and whether the files were equivalent or not at that
+     * time. The file format is filename (of source), null character, the byte
+     * data of the corresponding CachedWriteTime, and a newline character.
+     */
+    void loadCacheFile(const fs::path& filename);
+    
+    /**
+     * Creates a cache file using the format mentioned in loadCacheFile().
+     */
+    void saveCacheFile(const fs::path& filename);
     
     /**
      * Get the next set of write/read paths from configFile_, or return empty
@@ -178,16 +195,26 @@ public:
     bool checkPathIgnored(const fs::path& p) const;
     
 private:
+    /**
+     * Stores last known modification timestamps and equivalence of a source and
+     * destination file. Used for reducing the number of file scans required in
+     * checkFileEquivalence().
+     */
+    struct CachedWriteTime {
+        fs::file_time_type sourceTime;
+        fs::file_time_type destTime;
+        bool fileEquivalence;
+    };
+    
     std::ifstream configFile_;
     fs::path configFilename_;
     unsigned int lineNumber_;
     std::map<fs::path, fs::path> rootPaths_;
     std::set<fs::path> ignorePaths_;
     std::set<fs::path> previousReadPaths_;
-    std::vector<std::pair<fs::path, fs::path>> globPortableResults_;
-    size_t globPortableResultsIndex_;
     fs::path writePath_, readPath_;
     bool writePathSet_, readPathSet_;
+    std::map<fs::path, CachedWriteTime> cachedWriteTimes_;    // May be a good idea to use a radix tree instead of std::map, but also good to stick with simplicity. ###############################################
     
     /**
      * Determines if the current sub-path is ignored given the current position
