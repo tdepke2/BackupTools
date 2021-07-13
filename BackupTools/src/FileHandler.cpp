@@ -344,21 +344,17 @@ bool FileHandler::checkFileEquivalence(const fs::path& source, const fs::path& d
     bool equalResult = false;
     std::ifstream sourceFile(source, std::ios::ate | std::ios::binary);    // Open files in binary mode and seek to end.
     std::ifstream destFile(dest, std::ios::ate | std::ios::binary);
+    const std::ios::pos_type sourceSize = sourceFile.tellg();    // Find file sizes.
+    const std::ios::pos_type destSize = destFile.tellg();
     
-    if (sourceFile.is_open() && destFile.is_open()) {
-        // TODO: may want to merge these two if statements if tellg can work on closed files. ##########################################################################
-        const std::ios::pos_type sourceSize = sourceFile.tellg();    // Find file sizes.
-        const std::ios::pos_type destSize = destFile.tellg();
+    if (sourceFile.is_open() && destFile.is_open() && sourceSize == destSize) {
+        sourceFile.seekg(0);    // Return to beginning of files.
+        destFile.seekg(0);
         
-        if (sourceSize == destSize) {
-            sourceFile.seekg(0);    // Return to beginning of files.
-            destFile.seekg(0);
-            
-            std::istreambuf_iterator<char> sourceIter(sourceFile);
-            std::istreambuf_iterator<char> destIter(destFile);
-            
-            equalResult = std::equal(sourceIter, std::istreambuf_iterator<char>(), destIter);    // Compare streams to check for equality (both streams are same length so this is safe).
-        }
+        std::istreambuf_iterator<char> sourceIter(sourceFile);
+        std::istreambuf_iterator<char> destIter(destFile);
+        
+        equalResult = std::equal(sourceIter, std::istreambuf_iterator<char>(), destIter);    // Compare streams to check for equality (both streams are same length so this is safe).
     }
     if (!skipCache) {
         lastWriteTime->second.sourceTime = fs::last_write_time(source);
