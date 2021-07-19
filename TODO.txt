@@ -2,6 +2,5 @@ Fixes:
     * Comments could use some work, maybe try doxygen standard?
 
 Additions:
-    * CMake build script.
     * Build and test on linux system.
     * Script to run automated backups (or at least instructions on how to set this up with cron job).

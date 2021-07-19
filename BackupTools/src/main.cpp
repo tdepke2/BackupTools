@@ -9,6 +9,11 @@
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
+    #define NOMINMAX
+    #include <windows.h>
+#endif
+
 namespace fs = std::filesystem;
 
 /**
@@ -291,6 +296,13 @@ std::vector<char*> splitArguments(const std::string& str) {
 }
 
 int main(int argc, const char** argv) {
+    // On Windows, adjust the console mode to get escape sequences working (colored text in console).
+    #ifdef _WIN32
+    HANDLE hConsole;
+    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleMode(hConsole, ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT);
+    #endif
+    
     if (argc >= 2) {
         runCommand(argc, argv);
     } else {
