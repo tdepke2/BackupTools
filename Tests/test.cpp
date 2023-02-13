@@ -1,7 +1,7 @@
 // Note: need to define /Zc:__cplusplus to get this to compile with VS2017 using c++17
 #include "pch.h"
-#include "../BackupTools/src/ArgumentParser.h"
-#include "../BackupTools/src/FileHandler.h"
+#include "ArgumentParser.h"
+#include "FileHandler.h"
 #include <string>
 
 // ****************************************************************************
