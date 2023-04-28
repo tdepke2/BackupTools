@@ -3,12 +3,14 @@
 #include "ArgumentParser.h"
 #include "FileHandler.h"
 #include <string>
+#include <cstring>
 
 // ****************************************************************************
 // * TestGlobbing                                                             *
 // ****************************************************************************
 
 TEST(TestGlobbing, NoWildcards) {
+    FileHandler::pathSeparator = '\\';
     FileHandler::globMatchesHiddenFiles = false;
     
     EXPECT_EQ(FileHandler::fnmatchPortable("", ""), true);
@@ -31,6 +33,7 @@ TEST(TestGlobbing, NoWildcards) {
 }
 
 TEST(TestGlobbing, CommonCaseTests) {
+    FileHandler::pathSeparator = '\\';
     FileHandler::globMatchesHiddenFiles = false;
     
     EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\file.txt", "C:\\path\\to\\file.txt"), true);
@@ -71,6 +74,7 @@ TEST(TestGlobbing, CommonCaseTests) {
 }
 
 TEST(TestGlobbing, QuestionMark) {
+    FileHandler::pathSeparator = '\\';
     FileHandler::globMatchesHiddenFiles = false;
     
     EXPECT_EQ(FileHandler::fnmatchPortable("?", ""), false);
@@ -102,6 +106,7 @@ TEST(TestGlobbing, QuestionMark) {
 }
 
 TEST(TestGlobbing, Star) {
+    FileHandler::pathSeparator = '\\';
     FileHandler::globMatchesHiddenFiles = false;
     
     // Single star.
@@ -189,6 +194,7 @@ TEST(TestGlobbing, Star) {
 }
 
 TEST(TestGlobbing, Brackets) {
+    FileHandler::pathSeparator = '\\';
     FileHandler::globMatchesHiddenFiles = false;
     
     // No ranges.
@@ -471,6 +477,7 @@ TEST(TestGlobbing, Brackets) {
 }
 
 TEST(TestGlobbing, Comprehensive) {
+    FileHandler::pathSeparator = '\\';
     FileHandler::globMatchesHiddenFiles = false;
     
     EXPECT_EQ(FileHandler::fnmatchPortable("C:\\path\\to\\*.???", "a.aaa"), false);
@@ -492,6 +499,7 @@ TEST(TestGlobbing, Comprehensive) {
 }
 
 TEST(TestGlobbing, GlobMatchesHidden) {
+    FileHandler::pathSeparator = '\\';
     FileHandler::globMatchesHiddenFiles = true;
     
     EXPECT_EQ(FileHandler::fnmatchPortable("?", "x"), true);

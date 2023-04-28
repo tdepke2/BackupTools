@@ -1,11 +1,17 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.14...3.26)
+
 
 # Set project name and version.
-project(backup_tools)
+project(backup_tools
+    VERSION 1.0
+    DESCRIPTION "Simple automatic and manual backups for local storage"
+    LANGUAGES CXX
+)
 
 # Specify C++17 standard (for std::filesystem library).
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ standard to use")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Create the executable from all source files.
 # It's recommended to list source files explicitly instead of using a glob.
@@ -46,8 +52,7 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/BackupTools/include
 )
 target_link_libraries(
-  hello_test
-  gtest_main
+  hello_test PUBLIC gtest_main
 )
 
 include(GoogleTest)

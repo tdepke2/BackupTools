@@ -268,7 +268,7 @@ std::vector<char*> splitArguments(const std::string& str) {
         if (str[index] == ' ' && !withinQuotes) {    // If space and no quotes, this marks end the argument.
             if (withinArg) {
                 argumentVec.push_back(new char[currentArg.size() + 1]);
-                strcpy_s(argumentVec.back(), currentArg.size() + 1, currentArg.c_str());
+                strcpy(argumentVec.back(), currentArg.c_str());
                 currentArg.clear();
                 withinArg = false;
             }
@@ -288,7 +288,7 @@ std::vector<char*> splitArguments(const std::string& str) {
     
     if (withinArg) {    // Add any remaining argument.
         argumentVec.push_back(new char[currentArg.size() + 1]);
-        strcpy_s(argumentVec.back(), currentArg.size() + 1, currentArg.c_str());
+        strcpy(argumentVec.back(), currentArg.c_str());
     }
     argumentVec.push_back(nullptr);    // Add trailing nullptr to mark the end.
     

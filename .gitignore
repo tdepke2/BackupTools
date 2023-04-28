@@ -3,6 +3,7 @@ packages/
 Debug/
 Release/
 x64/
+/build/
 *.sln
 *.vcxproj*
 *.o
