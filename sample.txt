@@ -1,0 +1,35 @@
+#set match-hidden false
+
+root x dest
+
+# Add all in current directory.
+#in "x" add ""
+#in "x" add **
+
+# Add files in current directory.
+#in x add *
+
+# Add only .txt files in the project files.
+#in x/ add "C:\Users\Thomas Depke\Documents\Visual Studio 2017\Projects\BackupTools\**\*.txt"
+
+#ignore "C:\Users\Thomas Depke\Documents\Visual Studio 2017\Projects\BackupTools\BackupTools\source\*\*.txt"
+#ignore *.txt
+#ignore n
+#ignore beans/a/beans/b/thing.txt
+ignore ignore.txt
+ignore **/beans/a/**/thing.txt
+
+in dest2 add nonexistent.dat
+in x add source/**
+in dest2 add source/tmp.txt
+
+ignore *.exe
+
+# comment
+
+#in x 
+#    add ""    
+
+ include *.exe
+
+    # commands: root, in, add, ignore, include
