@@ -9,13 +9,6 @@ project(backup_tools
 
 # Check if this is the main project (not included with add_subdirectory).
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-
-
-
-#FIXME something still wrong here? the default build seems to be debug...
-
-
-
     # Set default build type if unspecified.
     # From https://cliutils.gitlab.io/modern-cmake/chapters/features.html
     set(default_build_type "Release")
@@ -28,6 +21,10 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
         set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo"
         )
+    elseif(CMAKE_BUILD_TYPE)
+        message(STATUS "Current build type is '${CMAKE_BUILD_TYPE}'.")
+    elseif(CMAKE_CONFIGURATION_TYPES)
+        message(STATUS "Build type is not set, select it during build with '--config' option and one of the following: '${CMAKE_CONFIGURATION_TYPES}'.")
     endif()
 
     # Specify C++17 standard (for std::filesystem library).
@@ -53,10 +50,7 @@ endif()
 # Add the executable code.
 add_subdirectory(src)
 
-#option(BUILD_TESTS "Build the tests" ON)
-#if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTS)
-
 # Add tests if this is the main project and testing is enabled.
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
-    #add_subdirectory(tests)
+    add_subdirectory(tests)
 endif()
