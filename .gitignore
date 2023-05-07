@@ -1,3 +1,6 @@
-/build/
-*.o
-*.exe
+/.cache/
+/build*/
+compile_commands.json
+*.sublime-project
+*.sublime-workspace
+*.DS_Store

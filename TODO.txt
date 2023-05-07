@@ -4,3 +4,6 @@ Fixes:
 Additions:
     * Build and test on linux system.
     * Script to run automated backups (or at least instructions on how to set this up with cron job).
+
+Project structure:
+    https://api.csswg.org/bikeshed/?force=1&url=https://raw.githubusercontent.com/vector-of-bool/pitchfork/develop/data/spec.bs

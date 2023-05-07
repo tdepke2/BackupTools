@@ -9,6 +9,13 @@ project(backup_tools
 
 # Check if this is the main project (not included with add_subdirectory).
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+
+
+
+#FIXME something still wrong here? the default build seems to be debug...
+
+
+
     # Set default build type if unspecified.
     # From https://cliutils.gitlab.io/modern-cmake/chapters/features.html
     set(default_build_type "Release")
@@ -27,6 +34,14 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     set(CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ standard to use")
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CMAKE_CXX_EXTENSIONS OFF)
+
+    # Place binaries in lib/ or bin/ respectively instead of in the sources directory.
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
+    # Have CMake create a "compile_commands.json" file for clangd.
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
     # Enable support for folders in IDEs.
     set_property(GLOBAL PROPERTY USE_FOLDERS ON)
